@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>לעבוד ב-VS Code — מדריך מהיר</title>
+<style>
+  :root{
+    --bg:#0f1420; --card:#171e2e; --card2:#1e2739; --ink:#eaf0fb; --muted:#9fb0cc;
+    --line:#2a3550; --accent:#5b9dff; --work:#f4b942; --done:#3fbf7f; --alert:#ff6b6b;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#f4f7fc; --card:#fff; --card2:#f0f4fb; --ink:#12203a; --muted:#5a6b88;
+           --line:#e0e7f3; --accent:#2f6fe0; --shadow:0 10px 28px rgba(20,40,80,.10); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"Segoe UI",Arial,system-ui,sans-serif;line-height:1.7}
+  .wrap{max-width:880px;margin:0 auto;padding:28px 20px 80px}
+  header{text-align:center;padding:26px 0 8px}
+  h1{font-size:2rem;margin:.2em 0}
+  .sub{color:var(--muted);font-size:1.05rem}
+  .stamp{display:inline-block;margin-top:10px;font-size:.8rem;color:var(--muted);
+         border:1px solid var(--line);border-radius:999px;padding:3px 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:22px 24px;margin:18px 0;box-shadow:var(--shadow)}
+  h2{font-size:1.35rem;margin:.1em 0 .5em;display:flex;align-items:center;gap:.5rem}
+  h2 .ic{font-size:1.35rem}
+  p{margin:.5em 0}
+  .muted{color:var(--muted)}
+  code{background:var(--card2);border:1px solid var(--line);border-radius:7px;
+       padding:2px 8px;font-family:Consolas,monospace;font-size:.92em;direction:ltr;display:inline-block}
+  kbd{background:var(--card2);border:1px solid var(--line);border-bottom-width:3px;border-radius:7px;
+      padding:2px 9px;font-family:Consolas,monospace;font-size:.9em;direction:ltr;display:inline-block}
+  .callout{border-right:4px solid var(--accent);background:var(--card2);
+       border-radius:10px;padding:12px 16px;margin:14px 0}
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+  ol.steps li{counter-increment:s;position:relative;padding:12px 56px 12px 8px;margin:8px 0;
+       background:var(--card2);border:1px solid var(--line);border-radius:12px}
+  ol.steps li::before{content:counter(s);position:absolute;right:14px;top:12px;
+       width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-weight:700}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:right;vertical-align:top}
+  th{background:var(--card2)}
+  td kbd{white-space:nowrap}
+
+  /* screen map */
+  .map{display:grid;grid-template-columns:46px 150px 1fr 170px;grid-template-rows:auto 120px;
+       gap:6px;background:#0b1020;border:1px solid var(--line);border-radius:12px;padding:8px;direction:ltr}
+  .map .box{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.72rem;color:var(--muted);
+       display:flex;flex-direction:column;gap:4px;justify-content:center;text-align:center;min-height:0}
+  .map .lbl{font-weight:700;color:var(--ink);font-size:.75rem}
+  .map .activity{grid-row:1/3}
+  .map .side{grid-row:1/2}
+  .map .editor{grid-row:1/2}
+  .map .panel{grid-column:2/4;grid-row:2/3;background:#0e1526}
+  .map .ttabs{grid-column:4/5;grid-row:1/3;background:#0e1526}
+  .map .chip{background:#141d33;border:1px solid var(--line);border-radius:7px;padding:4px 6px;
+       font-family:Consolas,monospace;font-size:.72rem;color:#cfe0ff;display:flex;gap:6px;justify-content:flex-start}
+  .work{color:var(--work)} .done{color:var(--done)} .alert{color:var(--alert)}
+  .legend-inline{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .pill{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
+        border-radius:999px;padding:5px 12px;font-size:.9rem}
+  footer{text-align:center;color:var(--muted);font-size:.85rem;margin-top:30px}
+  @media(max-width:560px){ .map{grid-template-columns:36px 1fr 120px} .map .panel{grid-column:2/4} .map .ttabs{grid-column:1/4;grid-row:3/4} .map{grid-template-rows:auto 100px 90px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="font-size:2.6rem">🧭</div>
+    <h1>לעבוד ב-VS Code</h1>
+    <div class="sub">מדריך מהיר למי שלא הכיר — רק מה שצריך כדי לנהל את סשני Claude</div>
+    <div class="stamp">גרסה 2026-07-07 · v1 vscode-hub</div>
+  </header>
+
+  <div class="card">
+    <h2><span class="ic">🤔</span> רגע, מה זה VS Code בכלל?</h2>
+    <p>VS Code הוא סתם <b>חלון עבודה</b>. יש בו הרבה כפתורים, אבל <b>אנחנו משתמשים בו
+    כמעט רק בשביל דבר אחד</b>: להיות "החדר המשותף" שבו כל סשני Claude יושבים בטאבים
+    מסודרים בצד. תתעלם מרוב הכפתורים — נגיד לך בדיוק לאן להסתכל.</p>
+    <div class="callout">חשוב לזכור: הטרמינל בתוך VS Code הוא <b>אותו טרמינל רגיל</b> —
+    הכל עובד בדיוק כמו תמיד, פשוט מסודר יפה יותר.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🗺️</span> מפת המסך — 4 אזורים</h2>
+    <div class="map" aria-hidden="true">
+      <div class="box activity"><div class="lbl">①</div>סרגל<br>צד</div>
+      <div class="box side"><div class="lbl">②</div>קבצים<br>(לא חובה)</div>
+      <div class="box editor"><div class="lbl">③</div>עורך / קוד</div>
+      <div class="box panel">
+        <div class="lbl">④ הטרמינל — כאן Claude רץ</div>
+        <div style="font-family:Consolas,monospace;font-size:.72rem;color:#cfe0ff">&gt; ccm E:\sites\shop</div>
+      </div>
+      <div class="box ttabs">
+        <div class="lbl">רשימת הטאבים →</div>
+        <div class="chip"><span class="work">⚙</span> shop</div>
+        <div class="chip"><span class="alert">🔔</span> wa-bot</div>
+        <div class="chip"><span class="done">✅</span> reports</div>
+      </div>
+    </div>
+    <table>
+      <tr><th>#</th><th>אזור</th><th>מה עושים בו</th></tr>
+      <tr><td>①</td><td>סרגל צד (Activity Bar)</td><td>אפשר להתעלם. אלה כלים של VS Code שלא נצטרך.</td></tr>
+      <tr><td>②</td><td>רשימת קבצים</td><td>לא חובה. אפשר לסגור עם <kbd>Ctrl</kbd>+<kbd>B</kbd> כדי יותר מקום.</td></tr>
+      <tr><td>③</td><td>העורך</td><td>כאן נפתחים קבצים אם תרצה לראות אותם. לא הכרחי לעבודה עם Claude.</td></tr>
+      <tr><td>④</td><td><b>הטרמינל + רשימת הטאבים</b></td><td><b>כאן אנחנו חיים.</b> כל סשן Claude = טאב ברשימה שמימין לטרמינל.</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">⌨️</span> הטרמינל — כל מה שצריך</h2>
+    <ol class="steps">
+      <li><b>לפתוח את הטרמינל:</b> <kbd>Ctrl</kbd>+<kbd>ˋ</kbd> (המקש מעל Tab, משמאל ל-1). זה מראה/מסתיר את אזור ④.</li>
+      <li><b>סשן חדש (טאב חדש):</b> <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd>, או כפתור ה-<b>+</b> בפינת הטרמינל.</li>
+      <li><b>להריץ פרויקט:</b> בטאב החדש הקלד <code>ccm E:\נתיב\לפרויקט</code> ולחץ Enter.</li>
+      <li><b>לעבור בין סשנים:</b> פשוט <b>לחץ על שורה</b> ברשימה שמימין. זהו.</li>
+    </ol>
+    <div class="callout">כל טאב נקרא בשם התיקייה שלו + נורית סטטוס. הרשימה אנכית ולכן
+    <b>לא מצטמצמת</b> גם עם הרבה סשנים — בול מה שרצית.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🚦</span> הנוריות (המבט המהיר)</h2>
+    <div class="legend-inline">
+      <span class="pill"><span class="work" style="font-size:1.2rem">⚙</span> עובד — לך לטפל באחר</span>
+      <span class="pill"><span class="done" style="font-size:1.2rem">✅</span> התור שלך — חזור והמשך</span>
+      <span class="pill"><span class="alert" style="font-size:1.2rem">🔔</span> דורש אותך — טפל עכשיו (+צליל)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🎹</span> קיצורי המקלדת ששווה לזכור</h2>
+    <table>
+      <tr><th>פעולה</th><th>קיצור</th></tr>
+      <tr><td>הצג/הסתר טרמינל</td><td><kbd>Ctrl</kbd>+<kbd>ˋ</kbd></td></tr>
+      <tr><td>סשן/טאב חדש</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd></td></tr>
+      <tr><td>הרחב/הקטן את אזור הטרמינל</td><td>גרור את הגבול העליון שלו למעלה</td></tr>
+      <tr><td>הסתר את רשימת הקבצים (יותר מקום)</td><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td></tr>
+      <tr><td>חלון VS Code חדש</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">✅</span> הצעד הראשון שלך</h2>
+    <ol class="steps">
+      <li>פתח VS Code (מתפריט Start). זהו החדר.</li>
+      <li>לחץ <kbd>Ctrl</kbd>+<kbd>ˋ</kbd> — נפתח הטרמינל למטה.</li>
+      <li>הקלד <code>ccm E:\MAIN_CLAUDE\claudeCodeManager</code> ו-Enter.</li>
+      <li>מימין תופיע שורה <code>claudeCodeManager</code> — הצלחת! עכשיו נסה עוד אחת בטאב חדש.</li>
+    </ol>
+    <p class="muted">רוצה את התמונה המלאה של ה-Manager (התרחיש המלא, טעויות נפוצות)?
+    פתח את <code>USER_GUIDE.html</code> שלצידו.</p>
+  </div>
+
+  <footer>Claude Code Manager · מדריך VS Code · גרסה 2026-07-07 v1 vscode-hub</footer>
+</div>
+</body>
+</html>

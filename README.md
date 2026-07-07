@@ -42,6 +42,7 @@ ccm E:\path\to\some\project
 Open more projects by opening a new terminal tab (`Ctrl+Shift+5`) and running `ccm` again.
 Each becomes a row in the vertical tab list, named by its folder, with a live status glyph.
 
+- **New to VS Code? Start here (Hebrew):** [VSCODE_GUIDE.html](VSCODE_GUIDE.html) — screen map, terminal, shortcuts
 - **Full walk-through (Hebrew, non-technical):** [USER_GUIDE.html](USER_GUIDE.html) / [USER_GUIDE.md](USER_GUIDE.md)
 - **Developer summary (Hebrew):** [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
 - **Setup details:** [docs/vscode-setup.md](docs/vscode-setup.md)
@@ -60,6 +61,7 @@ Each becomes a row in the vertical tab list, named by its folder, with a live st
 claudeCodeManager/
 ├── README.md                 this file
 ├── PROJECT_SUMMARY.md        developer summary (Hebrew)
+├── VSCODE_GUIDE.html         "new to VS Code" onboarding (Hebrew)
 ├── USER_GUIDE.md             end-user manual (Hebrew)
 ├── USER_GUIDE.html           end-user manual, friendly HTML
 ├── docs/
