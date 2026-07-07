@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code Manager — מדריך למשתמש</title>
+<style>
+  :root{
+    --bg:#0f1420; --card:#171e2e; --card2:#1e2739; --ink:#eaf0fb; --muted:#9fb0cc;
+    --line:#2a3550; --accent:#5b9dff; --work:#f4b942; --done:#3fbf7f; --alert:#ff6b6b;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#f4f7fc; --card:#ffffff; --card2:#f0f4fb; --ink:#12203a; --muted:#5a6b88;
+           --line:#e0e7f3; --accent:#2f6fe0; --shadow:0 10px 28px rgba(20,40,80,.10); }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"Segoe UI",Arial,system-ui,sans-serif;line-height:1.7;}
+  .wrap{max-width:860px;margin:0 auto;padding:28px 20px 80px;}
+  header{text-align:center;padding:30px 0 10px;}
+  h1{font-size:2rem;margin:.2em 0;}
+  .sub{color:var(--muted);font-size:1.05rem}
+  .stamp{display:inline-block;margin-top:10px;font-size:.8rem;color:var(--muted);
+         border:1px solid var(--line);border-radius:999px;padding:3px 12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:22px 24px;margin:18px 0;box-shadow:var(--shadow);}
+  h2{font-size:1.35rem;margin:.1em 0 .5em;display:flex;align-items:center;gap:.5rem}
+  h2 .ic{font-size:1.4rem}
+  p{margin:.5em 0}
+  .muted{color:var(--muted)}
+  code,kbd{background:var(--card2);border:1px solid var(--line);border-radius:7px;
+       padding:2px 8px;font-family:"Consolas",monospace;font-size:.92em;direction:ltr;display:inline-block}
+  kbd{box-shadow:0 2px 0 var(--line)}
+  .legend{display:grid;gap:12px}
+  .row{display:flex;align-items:center;gap:14px;background:var(--card2);
+       border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+  .glyph{font-size:1.7rem;width:2.2rem;text-align:center;flex:none}
+  .row b{font-size:1.05rem}
+  .work b{color:var(--work)} .done b{color:var(--done)} .alert b{color:var(--alert)}
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+  ol.steps li{counter-increment:s;position:relative;padding:12px 56px 12px 8px;margin:8px 0;
+       background:var(--card2);border:1px solid var(--line);border-radius:12px}
+  ol.steps li::before{content:counter(s);position:absolute;right:14px;top:12px;
+       width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+       display:flex;align-items:center;justify-content:center;font-weight:700}
+  .timeline li{padding-left:8px}
+  .tag{display:inline-block;font-family:Consolas,monospace;font-size:.85em;border-radius:7px;
+       padding:1px 8px;direction:ltr;margin:0 2px}
+  .t-work{background:rgba(244,185,66,.15);color:var(--work);border:1px solid var(--work)}
+  .t-done{background:rgba(63,191,127,.15);color:var(--done);border:1px solid var(--done)}
+  .t-alert{background:rgba(255,107,107,.15);color:var(--alert);border:1px solid var(--alert)}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:10px 12px;text-align:right;vertical-align:top}
+  th{background:var(--card2)}
+  .callout{border-right:4px solid var(--accent);background:var(--card2);
+       border-radius:10px;padding:12px 16px;margin:14px 0}
+  .win{background:#0b1020;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0}
+  .win .bar{background:#111a2e;padding:8px 12px;color:var(--muted);font-size:.8rem;border-bottom:1px solid var(--line)}
+  .win .body{display:flex;min-height:150px}
+  .win .term{flex:1;padding:14px;font-family:Consolas,monospace;font-size:.85rem;color:#cfe0ff;direction:ltr}
+  .win .tabs{width:180px;flex:none;border-right:1px solid var(--line);background:#0e1526;padding:8px}
+  .win .tab{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+       font-size:.85rem;margin-bottom:6px;background:#141d33;direction:ltr;justify-content:flex-start}
+  .win .tab.active{outline:1px solid var(--accent)}
+  footer{text-align:center;color:var(--muted);font-size:.85rem;margin-top:30px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="font-size:2.6rem">🗂️</div>
+    <h1>Claude Code Manager</h1>
+    <div class="sub">חדר עבודה אחד לכל הפרויקטים שלך — עם שלט ונורית לכל אחד</div>
+    <div class="stamp">גרסה 2026-07-07 · v1 vscode-hub</div>
+  </header>
+
+  <div class="card">
+    <h2><span class="ic">💡</span> מה זה עושה, בפשטות</h2>
+    <p>דמיין שכל פרויקט הוא <b>עובד</b> שאתה נותן לו משימות. עד היום כל עובד ישב
+    בחדר נפרד (חלון נפרד), והיית רץ ביניהם לבדוק מי סיים. וכשהיו יותר מחמישה חדרים —
+    השלטים על הדלתות הצטמצמו עד שלא יכולת לקרוא.</p>
+    <p>הכלי מכניס את <b>כולם לחדר אחד</b>, ושם <b>רשימה מסודרת בצד</b> עם השם של כל
+    אחד ונורית שאומרת אם הוא עובד, מחכה לך, או צריך אותך דחוף. מבט אחד — ואתה יודע הכל.</p>
+
+    <div class="win" aria-hidden="true">
+      <div class="bar">VS Code — החדר המשותף</div>
+      <div class="body">
+        <div class="tabs">
+          <div class="tab"><span>⚙️</span><span>shop</span></div>
+          <div class="tab active"><span>🔔</span><span>wa-bot</span></div>
+          <div class="tab"><span>✅</span><span>reports</span></div>
+        </div>
+        <div class="term">&gt; ccm E:\bots\wa<br>Claude needs your approval…<br>› install package? (y/n)</div>
+      </div>
+    </div>
+    <p class="muted" style="text-align:center;font-size:.85rem">כך זה נראה: רשימה בצד, שם + נורית לכל סשן.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🚦</span> שלוש הנוריות</h2>
+    <div class="legend">
+      <div class="row work"><span class="glyph">⚙️</span><div><b>עובד</b><br><span class="muted">Claude עסוק — אפשר ללכת לטפל בסשן אחר.</span></div></div>
+      <div class="row done"><span class="glyph">✅</span><div><b>התור שלך</b><br><span class="muted">Claude סיים וממתין לך — חזור והמשך.</span></div></div>
+      <div class="row alert"><span class="glyph">🔔</span><div><b>דורש אותך עכשיו</b><br><span class="muted">מבקש אישור/החלטה (גם צליל) — טפל כדי שלא ייתקע.</span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🚀</span> איך מתחילים (פעם אחת)</h2>
+    <ol class="steps">
+      <li>פתח <b>PowerShell</b>.</li>
+      <li>הדבק והרץ:<br><code>E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1</code><br>
+          <span class="muted">מכין את הפקודה <code>ccm</code> ואת ההגדרות — ושומר גיבוי, אז אין סיכון.</span></li>
+      <li><b>סגור ופתח מחדש</b> חלון VS Code. חשוב! אחרת השינוי לא נכנס לתוקף.</li>
+    </ol>
+    <div class="callout">מעכשיו, חלון VS Code הוא ה"חדר המשותף" שלך.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">▶️</span> שימוש יומיומי</h2>
+    <p>כל מה שצריך לזכור זו פקודה אחת. בטרמינל של VS Code הקלד:</p>
+    <p style="text-align:center"><code>ccm &lt;נתיב-התיקייה&gt;</code></p>
+    <p>הכלי נכנס לתיקייה, נותן לטאב את שם התיקייה, ומריץ את Claude.</p>
+    <p>פרויקט נוסף? פתח טרמינל חדש עם <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd>
+       והרץ <code>ccm</code> שוב. כל אחד הופך לשורה ברשימה בצד.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🎬</span> תרחיש לדוגמה — מהתחלה ועד הסוף</h2>
+    <p class="muted">עובדים במקביל על אתר (<code>E:\sites\shop</code>) ובוט (<code>E:\bots\wa</code>).</p>
+    <ol class="steps timeline">
+      <li>פותחים חלון VS Code וטרמינל.</li>
+      <li>מקלידים <code>ccm E:\sites\shop</code> → בצד מופיע <span class="tag t-done">shop</span>.</li>
+      <li>מבקשים "תבנה עמוד תשלום" → השורה הופכת ל-<span class="tag t-work">⚙ shop</span>. לא צריך לחכות!</li>
+      <li>פותחים טרמינל שני ומריצים <code>ccm E:\bots\wa</code> → עכשיו שתי שורות בצד.</li>
+      <li>נותנים לבוט משימה. מנהלים שניים במקביל, ובמבט אחד רואים מי במצב מה.</li>
+      <li>אחרי דקה: <span class="tag t-alert">🔔 shop</span> + צליל — מבקש אישור להתקנה.
+          לוחצים על <code>shop</code>, מאשרים, והוא ממשיך <span class="tag t-work">⚙ shop</span>.</li>
+      <li>הבוט מסיים → <span class="tag t-done">✅ wa</span>. יודעים שהתור שלך שם.</li>
+      <li><b>סיימת בהצלחה</b> כשכל השורות ב-<span class="tag t-done">✅</span> ואף אחת לא ב-<span class="tag t-alert">🔔</span>.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🛟</span> טעויות נפוצות ופתרונן</h2>
+    <table>
+      <tr><th>מה השתבש</th><th>מה לעשות</th></tr>
+      <tr><td>הרצתי את ההתקנה אבל הטאבים לא בצד / הכותרת לא משתנה</td><td>לא פתחת חלון VS Code <b>חדש</b>. סגור לגמרי ופתח מחדש.</td></tr>
+      <tr><td><code>ccm</code> לא מוכר ("not recognized")</td><td>פתח טרמינל חדש, או הקלד <code>. $PROFILE</code>.</td></tr>
+      <tr><td>הנוריות לא מתחלפות בתוך VS Code</td><td>הקלד <code>$env:CCM_TITLE_MODE="ps"</code> ופתח חלון חדש; אם עדיין לא — נסה <code>"tty"</code>.</td></tr>
+      <tr><td>השם על הטאב נחתך</td><td>גרור את שפת רשימת הטאבים כדי להרחיב.</td></tr>
+      <tr><td>VS Code שאל אם לבטוח בתיקייה ("Restricted Mode")</td><td>לחץ "Trust". זה משפיע רק על VS Code, לא על הטרמינל.</td></tr>
+    </table>
+  </div>
+
+  <footer>Claude Code Manager · גרסה 2026-07-07 v1 vscode-hub · כלי מקומי, ללא רקע וללא רשת</footer>
+</div>
+</body>
+</html>

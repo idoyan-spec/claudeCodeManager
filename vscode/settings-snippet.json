@@ -1,0 +1,16 @@
+{
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-07 v1 vscode-hub).",
+  "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
+
+  "//tabs": "Show a vertical tab list on the RIGHT side of the terminal panel - it never shrinks like horizontal tabs.",
+  "terminal.integrated.tabs.enabled": true,
+  "terminal.integrated.tabs.location": "right",
+  "terminal.integrated.tabs.hideCondition": "never",
+
+  "//title": "Use the title the shell/hooks set via escape sequence -> '<status> <folder>'.",
+  "terminal.integrated.tabs.title": "${sequence}",
+  "terminal.integrated.tabs.description": "",
+
+  "//persist": "Keep terminals across window reloads so the hub survives a restart.",
+  "terminal.integrated.enablePersistentSessions": true
+}
