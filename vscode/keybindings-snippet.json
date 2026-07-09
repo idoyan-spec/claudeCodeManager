@@ -1,4 +1,4 @@
-// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-09 17:51 v8 tab-focus).
+// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-09 18:20 v9 active-tab-and-idle).
 // Merge into your VS Code keybindings.json. install.ps1 does it for you (with a backup).
 //
 // Goal: the caret should land on the prompt line of the session you moved to,

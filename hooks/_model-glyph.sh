@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: build the tab title "<model> <status> <folder>".
-# BUILD: 2026-07-09 17:51 v8 tab-focus
+# BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 #
 # Why the model lives in the TITLE and not in the tab colour:
 #   VS Code freezes a terminal's icon and colour at creation time -

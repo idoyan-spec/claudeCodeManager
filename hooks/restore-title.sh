@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-09 17:51 v8 tab-focus
+# BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 #
 # Title format:  "<model square> <status> <folder>"   e.g.  "🟨 ⟳ claudeCodeManager"
 #
@@ -14,14 +14,26 @@
 # "working" is debounced (~2s) because PostToolUse fires after every tool and
 # the PowerShell fallback costs ~500ms. "done"/"attention" always apply so the
 # final state is never missed.
+#
+# THE IDLE NOTIFICATION IS NOT AN ALARM. Claude Code fires `Notification` for two
+# unrelated things: a real permission/decision request, and "you have been idle
+# for ~60s". Treating both as "‼" meant every finished tab silently decayed from
+# ✓ to ‼ one minute later, and the glyph stopped meaning anything. Measured in
+# set-title.log: `done` and `attention` counts were near-identical (145 vs 143).
+#
+# Distinguishing them is awkward. `notification_type` is the structured field,
+# but it is reported missing on permission prompts (anthropics/claude-code#11964),
+# and the `message` strings are not in the docs. So: check BOTH, and let anything
+# unrecognised keep shouting. A spurious ‼ is a nuisance; a swallowed permission
+# request stalls the session forever. Fail loud.
+#
+# The raw payload of every Notification is appended to notifications.log, so this
+# can be re-derived from evidence when Claude Code changes the shape.
 
 state="${1:-done}"
+force=1
 case "$state" in
-  working)   glyph="⟳"; force=0 ;;
-  done)      glyph="✓"; force=1 ;;
-  attention) glyph="‼"; force=1 ;;
-  --force)   glyph="✓"; force=1 ;;
-  *)         glyph="✓"; force=1 ;;
+  working) force=0 ;;
 esac
 
 # Hooks receive their event JSON on stdin. Read it only when stdin is a pipe,
@@ -30,6 +42,31 @@ INPUT=""
 if [ ! -t 0 ]; then INPUT=$(cat); fi
 
 source "$HOME/.claude/skills/session-behavior/scripts/_model-glyph.sh"
+
+# Demote an idle notification to "your turn" before it becomes a glyph.
+if [ "$state" = "attention" ]; then
+  NOTIF_LOG="$HOME/.claude/skills/session-behavior/notifications.log"
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INPUT" >> "$NOTIF_LOG" 2>/dev/null
+
+  ntype=$(ccm_json_str "$INPUT" notification_type)
+  nmsg=$(ccm_json_str "$INPUT" message)
+  case "$ntype" in
+    idle_prompt) state="done" ;;
+    "")
+      # No structured field: fall back to the message. Only the idle text is
+      # demoted; an unknown message stays an alarm.
+      case "$nmsg" in
+        *[Ww]aiting*) state="done" ;;
+      esac
+      ;;
+  esac
+fi
+
+case "$state" in
+  working)   glyph="⟳" ;;
+  attention) glyph="‼" ;;
+  *)         glyph="✓" ;;
+esac
 
 session_id=$(ccm_json_str "$INPUT" session_id)
 [ -n "$session_id" ] || session_id="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"

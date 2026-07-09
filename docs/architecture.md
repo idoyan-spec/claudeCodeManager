@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 17:51 v8 tab-focus`
+**Build:** `2026-07-09 18:20 v9 active-tab-and-idle`
 
 ## Three problems, three fixes
 
@@ -12,9 +12,13 @@
    runs. Fix: encode both in the **tab title**, driven by Claude Code **hooks**
    that already fire on session events.
 
-3. **Which tab am I on?** — Fix: `terminal.tab.activeBorder` paints a bright
-   border on the focused tab, and `terminal.integrated.tabs.showActiveTerminal:
-   always` names it in a header above the list. Pure settings, no code.
+3. **Which tab am I on?** — Fix: an amber `terminal.tab.activeBorder` plus a
+   filled row background. `terminal.tab.activeBorder` is the **only**
+   terminal-tab-specific colour VS Code defines, and it is a thin line; the row
+   fill has to come from the global `list.*` selection colours, which also tint
+   Explorer/Search. Accepted trade. The load-bearing key is
+   `list.inactiveSelectionBackground` — while you type in the terminal the tab
+   list is unfocused, so its selected row is drawn as an *inactive* selection.
 
 ## The title: `<model> <status> <folder>`
 
@@ -26,7 +30,8 @@ Example: `🟨 ⟳ claudeCodeManager` — an Opus session that is currently work
 | `UserPromptSubmit`      | `⟳`          | working      |
 | `PostToolUse`           | `⟳`          | working      |
 | `Stop`                  | `✓`          | your turn    |
-| `Notification`          | `‼`          | needs you    |
+| `Notification` (idle)   | `✓`          | your turn    |
+| `Notification` (other)  | `‼`          | needs you    |
 
 | Model  | Square |
 |--------|--------|
@@ -37,6 +42,21 @@ Example: `🟨 ⟳ claudeCodeManager` — an Opus session that is currently work
 
 `PostToolUse` fires after every tool call, so it is **debounced (~2s)**;
 `Stop`/`Notification` always apply so the final state never gets lost.
+
+**Not every Notification is an alarm.** Claude Code raises `Notification` both
+for a permission/decision request *and* for "idle ~60s waiting for input". Painting
+both as `‼` meant a finished tab decayed from `✓` to `‼` a minute later, and the
+glyph stopped carrying information — `set-title.log` showed 145 `done` events
+against 143 `attention` events.
+
+`restore-title.sh` demotes the idle case to `✓`. It checks the structured
+`notification_type == idle_prompt` first, then falls back to matching the
+`message` text, because `notification_type` is reported missing on permission
+prompts (anthropics/claude-code#11964) and the message strings are undocumented.
+Anything unrecognised **stays** `‼`: a spurious alarm is a nuisance, a swallowed
+permission request stalls the session forever. The raw payload of every
+Notification is appended to `notifications.log` so the matching can be re-derived
+from evidence rather than re-guessed.
 
 ## Why the model is a square in the title, not the tab colour
 

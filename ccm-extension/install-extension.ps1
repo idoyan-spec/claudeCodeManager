@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 17:51 v8 tab-focus
+# install-extension.ps1  |  BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #

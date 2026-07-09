@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 17:51 v8 tab-focus`
+**גרסה / Build:** `2026-07-09 18:20 v9 active-tab-and-idle`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -43,7 +43,9 @@
 4. **למה בכותרת ולא בצבע הטאב:** `TerminalOptions.color`/`iconPath` נצרכים פעם אחת ב-`createTerminal()`
    ואין להם setter; `workbench.action.terminal.changeIcon` מתעלם מארגומנטים (vscode#239973 נדחה);
    ו-Claude Code לא שומר את המודל הפעיל בשום קובץ. הכותרת היא המשטח היחיד שיכול לעקוב.
-5. **טאב פעיל:** `terminal.tab.activeBorder` + `terminal.integrated.tabs.showActiveTerminal: always`.
+5. **טאב פעיל:** קו ענבר (`terminal.tab.activeBorder`) + רקע מלא. `terminal.tab.activeBorder` הוא הצבע
+   **היחיד** שקיים לטאבי טרמינל, ולכן הרקע מגיע מ-`list.*SelectionBackground` הגלובליים (משפיע גם על Explorer).
+   הקריטי הוא `list.inactiveSelectionBackground` — כשמקלידים בטרמינל הרשימה לא בפוקוס.
 6. **הגעת הכותרת לטאב:** בפועל **תמיד** דרך `set-tab-title.ps1` (`AttachConsole`+`SetConsoleTitle`,
    ו-ConPTY מעביר ל-VS Code כ-`${sequence}`). הכתיבה ל-`/dev/tty` נכשלת תמיד — Claude מריץ הוקים
    בלי טרמינל שולט. `CCM_TITLE_MODE=tty|ps|auto` שולט, וכל קריאה נרשמת בלוג כ-`apply via=`.
@@ -75,6 +77,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-09 | **טאב נבחר בולט + `‼` שהפסיק לשקר (`v9`):** (1) הרקע של השורה הנבחרת — `terminal.tab.activeBorder` הוא הצבע היחיד שקיים לטאבי טרמינל (נבדק בחבילה של 1.128), ולכן הרקע חייב להגיע מ-`list.*Selection*` הגלובליים; המפתח הקריטי הוא `inactiveSelectionBackground`, כי בזמן הקלדה בטרמינל הרשימה אינה בפוקוס. (2) `Notification` נורה גם על בקשת-הרשאה וגם על "מחכה לך 60 שניות", ולכן כל `✓` הפך ל-`‼` אחרי דקה (בלוג: 145 `done` מול 143 `attention`). `restore-title.sh` מוריד את מקרה ה-idle ל-`✓` לפי `notification_type=idle_prompt`, ובנפילה לפי טקסט ה-`message` (השדה חסר בבקשות הרשאה — claude-code#11964). כל התראה לא-מוכרת **נשארת** `‼` — הכיוון הבטוח. כל מטען נשמר ל-`notifications.log` לאימות |
 | 2026-07-09 | **פוקוס אוטומטי על שורת ההקלדה (`v8 tab-focus`, משימה 3):** `focusMode: singleClick` (נמדד בקוד של VS Code 1.128: רק `onMouseClick`/`onMouseDblClick` קוראים אותו — **אף מטפל מקלדת לא**), `↑/↓` ברשימת הטאבים דרך `runCommands` (`list.select` מפעיל את `onDidOpen` שקורא `setActiveInstance` וממקד), ו-`Ctrl+↑/↓` בתוך טרמינל ל-`focusNext`/`focusPrevious`. הפוקוס הוא יחיד, ולכן "חצים ברשימה **וגם** סמן בשורה" בלתי אפשרי מעבר ללחיצה הראשונה — ומכאן פיצול המקשים. `install.ps1` מקבל שלב 4 שממזג `keybindings.json` (dedupe לפי key+command+when) |
 | 2026-07-09 | **הטאבים של התוסף היו קפואים (`v6 no-api-name`) — הבאג האמיתי:** `createTerminal({name})` מקבע `titleSource=Api`, ו-VS Code נותן ל-Api עדיפות **קבועה** על `${sequence}` — כלומר כל כותרת OSC שההוקים כתבו נזרקה. התסמין הטעה: האייקון עבד, המסגרת עבדה, ו-`GetConsoleTitle` על ה-shell החי החזיר בדיוק `⬛ ✓ קליקיט` — אבל הטאב הראה `קליקיט`. ההוכחה: טרמינל רגיל (`Ctrl+Shift+5`) באותו חלון, ללא `name`, הציג `🟥 ✓ הקלטה לקלוד`. התוסף (0.0.3) כבר לא מעביר `name` ושולח OSC בעצמו לפני `claude`. בנוסף (`v5`): הוסר ה-gate על `TERM_PROGRAM` ונוסף `apply via=tty\|ps\|failed` ללוג — נמדד ש-`/dev/tty` **תמיד נכשל** (הוקים רצים בלי טרמינל שולט), וש-`TERM_PROGRAM=vscode` דווקא כן מוגדר, מה שגרם לענף מת להיראות כאילו הוא זה שעובד |
 | 2026-07-09 | **טאב חדש נצבע מיד (`v4 startup-glyph`):** סשן טרי לא ענה עדיין, ולכן ה-transcript לא יודע מה המודל — נוסף `ccm_configured_model` שנופל חזרה ל-`"model"` מ-settings.json (פרויקט ואז משתמש), ו-`set-title.sh` צובע `✓` כבר ב-SessionStart במקום סטטוס ריק. לפני כן כל טאב בחלון VS Code שנפתח מחדש נראה ריק עד הפרומפט הראשון. בנוסף: `apply_tab_title` תמיד מחזיר 0 ו-`update-title.sh` עוטף ב-`|| true` (רץ תחת `set -e`), ו-`[ -w /dev/tty ]` הוחלף — בלי טרמינל שולט המכשיר "כתיב" אבל `open(2)` נכשל ב-`ENXIO` |

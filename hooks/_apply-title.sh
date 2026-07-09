@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: apply a tab title to the REAL terminal.
-# BUILD: 2026-07-09 17:51 v8 tab-focus
+# BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 #
 # Two paths, tried in order: an OSC write to /dev/tty, else the AttachConsole
 # helper (SetConsoleTitle; ConPTY forwards it to VS Code as `${sequence}`).

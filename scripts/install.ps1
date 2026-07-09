@@ -9,12 +9,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 17:51 v8 tab-focus
+  BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 17:51 v8 tab-focus'
+$BUILD = '2026-07-09 18:20 v9 active-tab-and-idle'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 
@@ -56,8 +56,21 @@ $want = [ordered]@{
 }
 
 # Merged separately: colorCustomizations is a nested object owned by the user,
-# so we add our one key without discarding theirs.
-$wantColors = @{ 'terminal.tab.activeBorder' = '#00b4ff' }
+# so we add our keys without discarding theirs.
+#
+# terminal.tab.activeBorder is the only terminal-tab-specific colour VS Code
+# defines, and it is a thin line. The row fill comes from the global list.*
+# colours, which also tint Explorer/Search selections - a deliberate trade.
+# inactiveSelection* is the load-bearing one: while you type in the terminal the
+# tab list is unfocused, so the selected row renders as an INACTIVE selection.
+$wantColors = @{
+    'terminal.tab.activeBorder'        = '#ffb300'
+    'list.activeSelectionBackground'   = '#0a4a75'
+    'list.activeSelectionForeground'   = '#ffffff'
+    'list.inactiveSelectionBackground' = '#0a4a75'
+    'list.inactiveSelectionForeground' = '#ffffff'
+    'list.focusOutline'                = '#ffb300'
+}
 
 if (-not (Test-Path $settings)) {
     New-Item -ItemType File -Path $settings -Force | Out-Null

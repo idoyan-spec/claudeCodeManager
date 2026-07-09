@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook script.
-# BUILD: 2026-07-09 17:51 v8 tab-focus
+# BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
 #
 # Reads JSON from stdin ({ session_id, transcript_path, cwd, prompt, ... }) and
 # sets the tab title to "<model square> <status> <folder>". The user just

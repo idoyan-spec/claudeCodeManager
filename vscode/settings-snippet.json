@@ -1,5 +1,5 @@
 {
-  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 17:51 v8 tab-focus).",
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 18:20 v9 active-tab-and-idle).",
   "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
 
   "//tabs": "Show a vertical tab list on the LEFT side of the terminal panel - it never shrinks like horizontal tabs.",
@@ -11,10 +11,16 @@
   "terminal.integrated.tabs.title": "${sequence}",
   "terminal.integrated.tabs.description": "",
 
-  "//active": "Make the focused terminal unmistakable: a bright border on its tab, plus a header naming it.",
+  "//active": "Make the selected terminal unmistakable. `terminal.tab.activeBorder` is the ONLY terminal-tab-specific colour VS Code has, and it is a thin line - the row's fill comes from the GLOBAL list colours below, which also tint the Explorer/Search selection. That is the trade.",
+  "//active2": "inactiveSelection* is the one that matters: while you type in the terminal, the tab list is unfocused, so the selected row is drawn as an *inactive* selection.",
   "terminal.integrated.tabs.showActiveTerminal": "always",
   "workbench.colorCustomizations": {
-    "terminal.tab.activeBorder": "#00b4ff"
+    "terminal.tab.activeBorder": "#ffb300",
+    "list.activeSelectionBackground": "#0a4a75",
+    "list.activeSelectionForeground": "#ffffff",
+    "list.inactiveSelectionBackground": "#0a4a75",
+    "list.inactiveSelectionForeground": "#ffffff",
+    "list.focusOutline": "#ffb300"
   },
 
   "//focus": "One click on a tab puts the caret on that session's prompt line. Default is doubleClick.",
