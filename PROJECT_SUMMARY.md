@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 v5 tty-first`
+**גרסה / Build:** `2026-07-09 v6 no-api-name`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -43,9 +43,12 @@
    ואין להם setter; `workbench.action.terminal.changeIcon` מתעלם מארגומנטים (vscode#239973 נדחה);
    ו-Claude Code לא שומר את המודל הפעיל בשום קובץ. הכותרת היא המשטח היחיד שיכול לעקוב.
 5. **טאב פעיל:** `terminal.tab.activeBorder` + `terminal.integrated.tabs.showActiveTerminal: always`.
-6. **הגעת הכותרת לטאב:** בתוך VS Code (`TERM_PROGRAM=vscode`) כתיבת OSC ישירה ל-`/dev/tty`
-   (זול); אחרת - fallback ל-`set-tab-title.ps1`. שליטה ע"י `CCM_TITLE_MODE=tty|ps|auto`.
-7. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
+6. **הגעת הכותרת לטאב:** בפועל **תמיד** דרך `set-tab-title.ps1` (`AttachConsole`+`SetConsoleTitle`,
+   ו-ConPTY מעביר ל-VS Code כ-`${sequence}`). הכתיבה ל-`/dev/tty` נכשלת תמיד — Claude מריץ הוקים
+   בלי טרמינל שולט. `CCM_TITLE_MODE=tty|ps|auto` שולט, וכל קריאה נרשמת בלוג כ-`apply via=`.
+7. **התוסף אסור לו לתת `name` ל-`createTerminal`:** זה מקבע `titleSource=Api` ש**גובר לצמיתות**
+   על `${sequence}` — הטאב קופא על השם ומתעלם מכל OSC של ההוקים. התוסף שולח OSC בעצמו ואז `claude`.
+8. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
 
 ## איך להשתמש
 ### התקנה / הכנה
@@ -68,6 +71,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-09 | **הטאבים של התוסף היו קפואים (`v6 no-api-name`) — הבאג האמיתי:** `createTerminal({name})` מקבע `titleSource=Api`, ו-VS Code נותן ל-Api עדיפות **קבועה** על `${sequence}` — כלומר כל כותרת OSC שההוקים כתבו נזרקה. התסמין הטעה: האייקון עבד, המסגרת עבדה, ו-`GetConsoleTitle` על ה-shell החי החזיר בדיוק `⬛ ✓ קליקיט` — אבל הטאב הראה `קליקיט`. ההוכחה: טרמינל רגיל (`Ctrl+Shift+5`) באותו חלון, ללא `name`, הציג `🟥 ✓ הקלטה לקלוד`. התוסף (0.0.3) כבר לא מעביר `name` ושולח OSC בעצמו לפני `claude`. בנוסף (`v5`): הוסר ה-gate על `TERM_PROGRAM` ונוסף `apply via=tty\|ps\|failed` ללוג — נמדד ש-`/dev/tty` **תמיד נכשל** (הוקים רצים בלי טרמינל שולט), וש-`TERM_PROGRAM=vscode` דווקא כן מוגדר, מה שגרם לענף מת להיראות כאילו הוא זה שעובד |
 | 2026-07-09 | **טאב חדש נצבע מיד (`v4 startup-glyph`):** סשן טרי לא ענה עדיין, ולכן ה-transcript לא יודע מה המודל — נוסף `ccm_configured_model` שנופל חזרה ל-`"model"` מ-settings.json (פרויקט ואז משתמש), ו-`set-title.sh` צובע `✓` כבר ב-SessionStart במקום סטטוס ריק. לפני כן כל טאב בחלון VS Code שנפתח מחדש נראה ריק עד הפרומפט הראשון. בנוסף: `apply_tab_title` תמיד מחזיר 0 ו-`update-title.sh` עוטף ב-`|| true` (רץ תחת `set -e`), ו-`[ -w /dev/tty ]` הוחלף — בלי טרמינל שולט המכשיר "כתיב" אבל `open(2)` נכשל ב-`ENXIO` |
 | 2026-07-09 | **סטטוס + מודל על הטאב:** `_model-glyph.sh` חדש (מודל מה-transcript, סינון sidechain, מטמון לפי session), כותרת `<ריבוע-מודל> <סטטוס> <תיקייה>`, נוריות ⟳/✓/‼, מסגרת על הטאב הפעיל; `.gitattributes` שמכריח LF ב-`*.sh` (autocrlf שבר את ההתקנה במחשב שני); `install.ps1` מפיץ הוקים במקום רק לבדוק אותם, ולא כופה יותר `tabs.location=right` |
 | 2026-07-09 | **כניסה בקליק אחד מ-Explorer:** תוסף `ccm-hub` (URI handler פותח טרמינל חדש בחלון הקיים — במקום SendKeys שביר), תפריט לחיצה-ימנית נייד (HKCU, ללא admin) עם מפעילי VBS ללא הבהוב, רשימת טאבים הועברה שמאלה, עברית כברירת-מחדל במקלדת |

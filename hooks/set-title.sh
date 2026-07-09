@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-09 v5 tty-first
+# BUILD: 2026-07-09 v6 no-api-name
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)

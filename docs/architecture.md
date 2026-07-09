@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 v5 tty-first`
+**Build:** `2026-07-09 v6 no-api-name`
 
 ## Three problems, three fixes
 
@@ -22,7 +22,7 @@ Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is currently worki
 
 | Event (hook)            | Status glyph | State        |
 |-------------------------|--------------|--------------|
-| `SessionStart`          | *(none)*     | fresh / idle |
+| `SessionStart`          | `✓`          | fresh / idle |
 | `UserPromptSubmit`      | `⟳`          | working      |
 | `PostToolUse`           | `⟳`          | working      |
 | `Stop`                  | `✓`          | your turn    |
@@ -78,16 +78,43 @@ this project forbids (see below).
 
 ## How the title reaches the tab
 
-Hook subprocesses do not share a normal TTY with the outer terminal, so setting
-the title takes one of two paths (`_apply-title.sh` → `apply_tab_title`):
+`_apply-title.sh` → `apply_tab_title` tries two paths, in order:
 
-- **Inside VS Code** (`TERM_PROGRAM=vscode`): write the OSC title sequence
-  straight to `/dev/tty`. Cheap — no extra process. This is the common path.
-- **Elsewhere** (Windows Terminal): fall back to `set-tab-title.ps1`, which
-  walks the process tree, `AttachConsole`s to the ancestor console, and
-  `SetConsoleTitle`. Proven, but spawns PowerShell (~500ms) — hence the debounce.
+1. Write the OSC title sequence straight to `/dev/tty`.
+2. Fall back to `set-tab-title.ps1`, which walks the process tree,
+   `AttachConsole`s to the ancestor console, and `SetConsoleTitle`s. ConPTY
+   forwards that title to VS Code, which renders it as `${sequence}`.
 
 Override with `CCM_TITLE_MODE=tty|ps|auto` (default `auto`).
+
+**Measured, not assumed:** path 1 **never fires in practice**. Claude Code spawns
+hooks with piped stdio and no controlling terminal, so opening `/dev/tty` fails
+with `ENXIO` — in VS Code and in Windows Terminal alike. Every real hook logs
+`apply via=ps`. Until v5 the tty branch was additionally gated on
+`TERM_PROGRAM=vscode` (which *is* set inside VS Code), so the gate looked like
+the reason VS Code worked; it wasn't. Path 2 does all the work everywhere. The
+attempt at path 1 is kept because it is one cheap `printf` and it is the right
+answer on any host that does give a hook a tty.
+
+`apply_tab_title` logs `via=tty|ps|failed` and `TERM_PROGRAM` to
+`set-title.log` on every call, so this never has to be re-derived by guesswork.
+
+## Why the extension must not name its terminal
+
+`ccm-hub` used to call `createTerminal({ name, cwd, iconPath })`. Passing `name`
+sets VS Code's `titleSource` to `Api`, and an **Api title outranks
+`${sequence}` permanently**: the tab freezes on the name given at creation and
+every OSC title the hooks write afterwards is discarded.
+
+The symptom was maximally confusing, because everything *else* worked. The
+sparkle icon appeared, the active-tab border appeared, and `GetConsoleTitle` on
+the live shell returned exactly `⬛ ✓ קליקיט` — yet the tab read `קליקיט`.
+Meanwhile a plain `Ctrl+Shift+5` terminal in the same window, created with no
+Api name, rendered `🟥 ✓ הקלטה לקלוד` correctly. That contrast is the proof.
+
+So the extension passes **no** `name`. It emits one OSC sequence itself before
+launching Claude, which titles the tab with the folder immediately; from the
+first `SessionStart` hook onward the hooks own the title.
 
 ## Why Claude Code's own title is disabled
 
@@ -109,12 +136,14 @@ This environment must not cost significant resources or add attack surface:
 - **No new privileges.** The VS Code integrated terminal is a *real* terminal —
   same shell, same user, same permissions as any standalone terminal. It is not
   a sandbox and does not reduce capability.
-- **Lighter than before inside VS Code:** the common path is a single `printf`
-  to `/dev/tty` instead of spawning PowerShell per event.
+- **One PowerShell per title change** (~500ms), which is why `PostToolUse` is
+  debounced. The `/dev/tty` shortcut would avoid it, but it does not work here
+  (see above) — the cost is real and accepted, not hypothetical.
 
 ## Failure modes & fallbacks
 
-- If `/dev/tty` is not writable, the code falls back to the PowerShell helper.
+- If `/dev/tty` cannot be opened — which is the normal case — the code falls back
+  to the PowerShell helper.
 - If the PowerShell helper can't find the console, the title simply doesn't
   update — nothing else breaks, the session runs normally.
 - `ccm.ps1` also sets the folder-name title itself at launch, so a tab is named

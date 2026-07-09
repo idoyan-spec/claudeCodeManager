@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-09 v5 tty-first`
+**Build:** `2026-07-09 v6 no-api-name`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each

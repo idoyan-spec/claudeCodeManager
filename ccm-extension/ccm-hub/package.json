@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],

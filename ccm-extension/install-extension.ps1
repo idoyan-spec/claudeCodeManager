@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 v3 status-icons
+# install-extension.ps1  |  BUILD: 2026-07-09 v6 no-api-name
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #

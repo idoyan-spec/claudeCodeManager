@@ -1,19 +1,19 @@
 #!/bin/bash
 # Shared helper: apply a tab title to the REAL terminal.
-# BUILD: 2026-07-09 v5 tty-first
+# BUILD: 2026-07-09 v6 no-api-name
 #
-# The hook's controlling tty IS the terminal's pty, so an OSC write to /dev/tty
-# lands on the tab with no helper process. That is true in a VS Code integrated
-# terminal (where `terminal.integrated.tabs.title: "${sequence}"` renders it) and
-# it costs nothing to attempt anywhere else.
+# Two paths, tried in order: an OSC write to /dev/tty, else the AttachConsole
+# helper (SetConsoleTitle; ConPTY forwards it to VS Code as `${sequence}`).
 #
-# So: always TRY the tty first, and fall back to the AttachConsole helper only
-# when the write actually fails. Until v5 the tty branch was gated on
-# `TERM_PROGRAM = vscode`. That variable is NOT set in the hook's environment
-# here, so VS Code silently took the PowerShell fallback - which walks the
-# process tree looking for WindowsTerminal, never finds it under Code.exe, and
-# paints nothing. The tab then falls back to the extension's
-# `createTerminal({name})`, i.e. a bare folder name. Probe, don't presume.
+# MEASURED: the tty path never succeeds under Claude Code. Hooks are spawned with
+# piped stdio and no controlling terminal, so open("/dev/tty") fails with ENXIO -
+# in VS Code and in Windows Terminal alike. Every real hook logs `via=ps`. It is
+# still attempted first: one cheap printf, and it is the right answer on a host
+# that does hand a hook a tty. Do not re-gate it on `TERM_PROGRAM = vscode`; that
+# variable *is* set inside VS Code, which made the dead branch look load-bearing.
+#
+# The `via=` field below exists so the next person reads the log instead of
+# guessing. Guessing cost two wrong fixes.
 #
 # Override with CCM_TITLE_MODE=tty|ps|auto (default auto).
 #
