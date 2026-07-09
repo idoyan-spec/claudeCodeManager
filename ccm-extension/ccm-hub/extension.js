@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-09 v7 opus-yellow
+// ccm-hub  |  BUILD: 2026-07-09 17:51 v8 tab-focus
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI. No SendKeys, no focus games — the Terminal API.
 //

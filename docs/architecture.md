@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 v7 opus-yellow`
+**Build:** `2026-07-09 17:51 v8 tab-focus`
 
 ## Three problems, three fixes
 
@@ -116,6 +116,41 @@ Api name, rendered `🟥 ✓ הקלטה לקלוד` correctly. That contrast is 
 So the extension passes **no** `name`. It emits one OSC sequence itself before
 launching Claude, which titles the tab with the folder immediately; from the
 first `SessionStart` hook onward the hooks own the title.
+
+## Focus: landing the caret on the prompt line
+
+Selecting a session should leave you ready to type. Focus is **singular** — it is
+either in the tab list or in a terminal — so "arrow through the list *and* be on
+the prompt line" is self-contradictory past the first press. Three situations:
+
+| You are… | Key | What happens |
+|----------|-----|--------------|
+| clicking a tab | single click | `terminal.integrated.tabs.focusMode: singleClick` |
+| in the tab list | `↑` / `↓` | move, enter that terminal, leave the list |
+| in a terminal | `Ctrl+↑` / `Ctrl+↓` | switch session, never leave the prompt line |
+
+Only the mouse case is a setting. Verified in the 1.128 bundle: `focusMode` is
+read by exactly two handlers — `onMouseClick` (acts on `singleClick`) and
+`onMouseDblClick` (acts on `doubleClick`). **No keyboard handler reads it**, so a
+keyboard fix through that setting is impossible.
+
+The list case uses `runCommands` to chain
+`list.focusDown` → `list.select` → `workbench.action.terminal.focus`.
+`list.select` fires the tab list's `onDidOpen`, which calls `setActiveInstance()`
+and focuses the instance; the trailing `terminal.focus` is belt-and-braces
+because `onDidOpen` honours `preserveFocus`. Plain `list.focusDown` alone only
+moves the highlight — that list's `onDidChangeFocus` updates a context key and
+nothing else.
+
+`Ctrl+↑`/`Ctrl+↓` override VS Code's default `scrollToPreviousCommand` /
+`scrollToNextCommand` (same keys, `when: terminalFocus`). Those navigate between
+past command outputs via shell integration, which is inert inside Claude Code's
+fullscreen TUI, so the trade costs nothing. `Alt+↑/↓` were free and would have
+avoided the override; `Ctrl` was chosen because it is easier to reach.
+`Ctrl+PageUp`/`Ctrl+PageDown` still work — they are the stock bindings for the
+same two commands.
+
+Settings and keybindings are both watched live: a focus change needs no reload.
 
 ## Why Claude Code's own title is disabled
 

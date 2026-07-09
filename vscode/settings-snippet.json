@@ -1,5 +1,5 @@
 {
-  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 v7 opus-yellow).",
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 17:51 v8 tab-focus).",
   "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
 
   "//tabs": "Show a vertical tab list on the LEFT side of the terminal panel - it never shrinks like horizontal tabs.",
@@ -16,6 +16,9 @@
   "workbench.colorCustomizations": {
     "terminal.tab.activeBorder": "#00b4ff"
   },
+
+  "//focus": "One click on a tab puts the caret on that session's prompt line. Default is doubleClick.",
+  "terminal.integrated.tabs.focusMode": "singleClick",
 
   "//persist": "Keep terminals across window reloads so the hub survives a restart.",
   "terminal.integrated.enablePersistentSessions": true

@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 v7 opus-yellow`
+**גרסה / Build:** `2026-07-09 17:51 v8 tab-focus`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -14,6 +14,7 @@
 | `scripts/ccm.ps1` | המשגר: פותח תיקייה כסשן בטאב הנוכחי, נותן לטאב את שם התיקייה ומריץ `claude` |
 | `scripts/install.ps1` | מתקין אידמפוטנטי: רושם את `ccm` ב-PROFILE, ממזג הגדרות VS Code (עם גיבוי), **מפיץ** את ההוקים ומאמת אותם |
 | `vscode/settings-snippet.json` | הגדרות הטרמינל של VS Code למיזוג |
+| `vscode/keybindings-snippet.json` | קיצורי המקשים לפוקוס: `↑/↓` ברשימת הטאבים, `Ctrl+↑/↓` בתוך טרמינל |
 | `docs/architecture.md` | איך זה עובד + פרופיל משאבים/אבטחה |
 | `docs/vscode-setup.md` | הסבר כל הגדרה + אימות |
 | `hooks/` | מקור-האמת של ההוקים; `install.ps1` מעתיק אותם ל-`~/.claude/skills/session-behavior/scripts` |
@@ -48,7 +49,10 @@
    בלי טרמינל שולט. `CCM_TITLE_MODE=tty|ps|auto` שולט, וכל קריאה נרשמת בלוג כ-`apply via=`.
 7. **התוסף אסור לו לתת `name` ל-`createTerminal`:** זה מקבע `titleSource=Api` ש**גובר לצמיתות**
    על `${sequence}` — הטאב קופא על השם ומתעלם מכל OSC של ההוקים. התוסף שולח OSC בעצמו ואז `claude`.
-8. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
+8. **פוקוס:** לחיצה אחת על טאב (`tabs.focusMode: singleClick`); `↑/↓` ברשימה = `runCommands` של
+   `list.focusDown`+`list.select`+`terminal.focus`; `Ctrl+↑/↓` בטרמינל = `focusNext`/`focusPrevious`
+   (דורס את `scrollToPrevious/NextCommand`, שלא רלוונטי ב-TUI של Claude).
+9. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
 
 ## איך להשתמש
 ### התקנה / הכנה
@@ -71,6 +75,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-09 | **פוקוס אוטומטי על שורת ההקלדה (`v8 tab-focus`, משימה 3):** `focusMode: singleClick` (נמדד בקוד של VS Code 1.128: רק `onMouseClick`/`onMouseDblClick` קוראים אותו — **אף מטפל מקלדת לא**), `↑/↓` ברשימת הטאבים דרך `runCommands` (`list.select` מפעיל את `onDidOpen` שקורא `setActiveInstance` וממקד), ו-`Ctrl+↑/↓` בתוך טרמינל ל-`focusNext`/`focusPrevious`. הפוקוס הוא יחיד, ולכן "חצים ברשימה **וגם** סמן בשורה" בלתי אפשרי מעבר ללחיצה הראשונה — ומכאן פיצול המקשים. `install.ps1` מקבל שלב 4 שממזג `keybindings.json` (dedupe לפי key+command+when) |
 | 2026-07-09 | **הטאבים של התוסף היו קפואים (`v6 no-api-name`) — הבאג האמיתי:** `createTerminal({name})` מקבע `titleSource=Api`, ו-VS Code נותן ל-Api עדיפות **קבועה** על `${sequence}` — כלומר כל כותרת OSC שההוקים כתבו נזרקה. התסמין הטעה: האייקון עבד, המסגרת עבדה, ו-`GetConsoleTitle` על ה-shell החי החזיר בדיוק `⬛ ✓ קליקיט` — אבל הטאב הראה `קליקיט`. ההוכחה: טרמינל רגיל (`Ctrl+Shift+5`) באותו חלון, ללא `name`, הציג `🟥 ✓ הקלטה לקלוד`. התוסף (0.0.3) כבר לא מעביר `name` ושולח OSC בעצמו לפני `claude`. בנוסף (`v5`): הוסר ה-gate על `TERM_PROGRAM` ונוסף `apply via=tty\|ps\|failed` ללוג — נמדד ש-`/dev/tty` **תמיד נכשל** (הוקים רצים בלי טרמינל שולט), וש-`TERM_PROGRAM=vscode` דווקא כן מוגדר, מה שגרם לענף מת להיראות כאילו הוא זה שעובד |
 | 2026-07-09 | **טאב חדש נצבע מיד (`v4 startup-glyph`):** סשן טרי לא ענה עדיין, ולכן ה-transcript לא יודע מה המודל — נוסף `ccm_configured_model` שנופל חזרה ל-`"model"` מ-settings.json (פרויקט ואז משתמש), ו-`set-title.sh` צובע `✓` כבר ב-SessionStart במקום סטטוס ריק. לפני כן כל טאב בחלון VS Code שנפתח מחדש נראה ריק עד הפרומפט הראשון. בנוסף: `apply_tab_title` תמיד מחזיר 0 ו-`update-title.sh` עוטף ב-`|| true` (רץ תחת `set -e`), ו-`[ -w /dev/tty ]` הוחלף — בלי טרמינל שולט המכשיר "כתיב" אבל `open(2)` נכשל ב-`ENXIO` |
 | 2026-07-09 | **סטטוס + מודל על הטאב:** `_model-glyph.sh` חדש (מודל מה-transcript, סינון sidechain, מטמון לפי session), כותרת `<ריבוע-מודל> <סטטוס> <תיקייה>`, נוריות ⟳/✓/‼, מסגרת על הטאב הפעיל; `.gitattributes` שמכריח LF ב-`*.sh` (autocrlf שבר את ההתקנה במחשב שני); `install.ps1` מפיץ הוקים במקום רק לבדוק אותם, ולא כופה יותר `tabs.location=right` |

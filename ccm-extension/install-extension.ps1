@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 v7 opus-yellow
+# install-extension.ps1  |  BUILD: 2026-07-09 17:51 v8 tab-focus
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #
