@@ -1,6 +1,8 @@
-' claude-hub.vbs  |  BUILD: 2026-07-09 v1  (ccm launcher: hub via extension)
+' claude-hub.vbs  |  BUILD: 2026-07-09 v2  (ccm launcher: hub via extension)
 ' Fires vscode://ccm.hub/session so the ccm-hub extension opens a new terminal
 ' (running Claude auto) in the CURRENT VS Code window. No console flicker.
+' If VS Code is CLOSED, it cold-starts a window first, waits for it to be ready,
+' then fires the URI (a URI fired at a dead instance is silently dropped).
 Option Explicit
 Dim folder, sh, fso, code, uri, i, lad, pf, pfx86, candidates
 
@@ -28,11 +30,43 @@ Next
 
 uri = "vscode://ccm.hub/session?path=" & UrlEncode(folder)
 
+' If VS Code isn't running, open a window and give it time to load + activate
+' the extension (which also activates onStartupFinished) before firing the URI.
+If Not CodeRunning() Then
+  If code <> "" Then
+    sh.Run """" & code & """", 1, False
+  Else
+    sh.Run "cmd /c code", 0, False
+  End If
+  ' wait for the process to appear, then a bit more for the workbench to be ready
+  Dim waited
+  waited = 0
+  Do While (Not CodeRunning()) And (waited < 20000)
+    WScript.Sleep 250
+    waited = waited + 250
+  Loop
+  WScript.Sleep 4000
+End If
+
 If code <> "" Then
   sh.Run """" & code & """ --open-url """ & uri & """", 0, False
 Else
-  sh.Run "cmd /c code --open-url """ & uri & """", 0, False   ' fallback via PATH
+  sh.Run "cmd /c code --open-url """ & uri & """", 0, False
 End If
+
+' --- is any Code.exe process alive? ---
+Function CodeRunning()
+  Dim wmi, procs
+  On Error Resume Next
+  Set wmi = GetObject("winmgmts:\\.\root\cimv2")
+  Set procs = wmi.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name='Code.exe'")
+  If Err.Number <> 0 Then
+    CodeRunning = True   ' if WMI fails, assume running (avoid opening extra windows)
+    Err.Clear
+    Exit Function
+  End If
+  CodeRunning = (procs.Count > 0)
+End Function
 
 ' --- UTF-8 percent-encoding (handles spaces, backslashes, Hebrew) ---
 Function UrlEncode(ByVal s)
@@ -41,7 +75,7 @@ Function UrlEncode(ByVal s)
   For k = 1 To Len(s)
     ch = Mid(s, k, 1)
     cp = AscW(ch)
-    If cp < 0 Then cp = cp + 65536   ' AscW returns signed
+    If cp < 0 Then cp = cp + 65536
     If (cp >= 48 And cp <= 57) Or (cp >= 65 And cp <= 90) Or (cp >= 97 And cp <= 122) Or InStr("-_.~", ch) > 0 Then
       res = res & ch
     Else
