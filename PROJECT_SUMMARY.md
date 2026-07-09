@@ -30,12 +30,20 @@
 - Win32 `AttachConsole`/`SetConsoleTitle` (מסלול fallback ל-Windows Terminal)
 
 ## איך זה עובד (בקצרה)
-1. **קריאוּת:** `terminal.integrated.tabs.location: "right"` → רשימה אנכית שלא מתכווצת.
-2. **סטטוס:** ההוקים כותבים כותרת `"<אימוג'י> <תיקייה>"`:
-   `⚙` עובד (UserPromptSubmit/PostToolUse) · `✅` התור שלך (Stop) · `🔔` דורש תשומת לב (Notification).
-3. **הגעת הכותרת לטאב:** בתוך VS Code (`TERM_PROGRAM=vscode`) כתיבת OSC ישירה ל-`/dev/tty`
+1. **קריאוּת:** `terminal.integrated.tabs.location: "left"` → רשימה אנכית שלא מתכווצת.
+2. **סטטוס + מודל:** ההוקים כותבים כותרת `"<ריבוע-מודל> <סטטוס> <תיקייה>"`, למשל `⬛ ⟳ claudeCodeManager`:
+   `⟳` עובד (UserPromptSubmit/PostToolUse) · `✓` התור שלך (Stop) · `‼` דורש תשומת לב (Notification).
+   ריבועים: `⬛` Opus · `🟦` Fable · `🟥` Haiku · `🟩` Sonnet.
+3. **מאיפה המודל:** `_model-glyph.sh` קורא את התור האחרון של ה-assistant מה-transcript
+   (מסנן sidechain, כדי שסאב-אייג'נט Haiku לא יצבע טאב של Opus) ומטמין את הריבוע לפי `session_id`.
+   `Stop` קורא מחדש בכל תור, ולכן `/model` משתקף מיד.
+4. **למה בכותרת ולא בצבע הטאב:** `TerminalOptions.color`/`iconPath` נצרכים פעם אחת ב-`createTerminal()`
+   ואין להם setter; `workbench.action.terminal.changeIcon` מתעלם מארגומנטים (vscode#239973 נדחה);
+   ו-Claude Code לא שומר את המודל הפעיל בשום קובץ. הכותרת היא המשטח היחיד שיכול לעקוב.
+5. **טאב פעיל:** `terminal.tab.activeBorder` + `terminal.integrated.tabs.showActiveTerminal: always`.
+6. **הגעת הכותרת לטאב:** בתוך VS Code (`TERM_PROGRAM=vscode`) כתיבת OSC ישירה ל-`/dev/tty`
    (זול); אחרת - fallback ל-`set-tab-title.ps1`. שליטה ע"י `CCM_TITLE_MODE=tty|ps|auto`.
-4. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
+7. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
 
 ## איך להשתמש
 ### התקנה / הכנה
@@ -58,5 +66,6 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-09 | **סטטוס + מודל על הטאב:** `_model-glyph.sh` חדש (מודל מה-transcript, סינון sidechain, מטמון לפי session), כותרת `<ריבוע-מודל> <סטטוס> <תיקייה>`, נוריות ⟳/✓/‼, מסגרת על הטאב הפעיל; `.gitattributes` שמכריח LF ב-`*.sh` (autocrlf שבר את ההתקנה במחשב שני); `install.ps1` מפיץ הוקים במקום רק לבדוק אותם, ולא כופה יותר `tabs.location=right` |
 | 2026-07-09 | **כניסה בקליק אחד מ-Explorer:** תוסף `ccm-hub` (URI handler פותח טרמינל חדש בחלון הקיים — במקום SendKeys שביר), תפריט לחיצה-ימנית נייד (HKCU, ללא admin) עם מפעילי VBS ללא הבהוב, רשימת טאבים הועברה שמאלה, עברית כברירת-מחדל במקלדת |
 | 2026-07-07 | גרסה ראשונה: משגר `ccm`, מתקין, הגדרות VS Code, סטטוס בהוקים (⚙/✅/🔔), מסלול OSC ל-VS Code + fallback ל-PowerShell, תיעוד + repo פרטי |

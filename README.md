@@ -23,9 +23,11 @@ Running one standalone terminal per project means:
 
 | Pain | Fix |
 |------|-----|
-| Tabs shrink when there are many | VS Code's **vertical** tab list on the right - never shrinks |
+| Tabs shrink when there are many | VS Code's **vertical** tab list on the left - never shrinks |
 | Can't tell which folder a tab is | Tab title = the **folder name** |
-| Can't tell working vs waiting | A **status glyph** driven by Claude Code hooks: `⚙` working · `✅` your turn · `🔔` needs you |
+| Can't tell working vs waiting | A **status glyph** driven by Claude Code hooks: `⟳` working · `✓` your turn · `‼` needs you |
+| Can't tell which model a session runs | A **coloured square** read from the transcript - follows `/model` live |
+| Can't tell which tab is focused | `terminal.tab.activeBorder` paints a bright border on it |
 
 ## Quick start
 
@@ -47,13 +49,27 @@ Each becomes a row in the vertical tab list, named by its folder, with a live st
 - **Developer summary (Hebrew):** [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
 - **Setup details:** [docs/vscode-setup.md](docs/vscode-setup.md)
 
-## Status glyphs
+## The tab title: `<model> <status> <folder>`
+
+Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is working.
 
 | Glyph | Meaning | Hook that sets it |
 |-------|---------|-------------------|
-| `⚙`  | Claude is working | `UserPromptSubmit`, `PostToolUse` |
-| `✅` | Claude finished - your turn | `Stop` |
-| `🔔` | Claude needs you now (permission / prompt) | `Notification` (+ sound) |
+| `⟳` | Claude is working | `UserPromptSubmit`, `PostToolUse` |
+| `✓` | Claude finished - your turn | `Stop` |
+| `‼` | Claude needs you now (permission / prompt) | `Notification` (+ sound) |
+
+| Square | Model |
+|--------|-------|
+| `⬛` | Opus |
+| `🟦` | Fable |
+| `🟥` | Haiku |
+| `🟩` | Sonnet |
+
+The model comes from the last non-sidechain assistant turn in the session
+transcript, so it follows `/model` and a Haiku subagent never repaints an Opus
+tab. It lives in the *title* rather than the tab colour because VS Code freezes
+a terminal's colour and icon at creation — see [docs/architecture.md](docs/architecture.md).
 
 ## Layout
 
