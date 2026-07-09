@@ -1,0 +1,9 @@
+# core.autocrlf=true would check these out with CRLF, and bash refuses a
+# shebang that ends in \r. The hooks must stay LF on every machine.
+*.sh text eol=lf
+
+# Windows-native launchers and scripts: CRLF is what wscript/powershell expect.
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
