@@ -17,6 +17,7 @@ $repoLaunchers = Join-Path $PSScriptRoot 'launchers'
 $runtimeDir    = Join-Path $env:USERPROFILE '.claude\ccm-launchers'
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 Copy-Item (Join-Path $repoLaunchers '*.vbs') $runtimeDir -Force
+Copy-Item (Join-Path $repoLaunchers '*.ps1') $runtimeDir -Force
 $termVbs = Join-Path $runtimeDir 'claude-terminal.vbs'
 $hubVbs  = Join-Path $runtimeDir 'claude-hub.vbs'
 Write-Host "  launchers -> $runtimeDir"

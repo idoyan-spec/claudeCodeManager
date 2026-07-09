@@ -30,43 +30,60 @@ Next
 
 uri = "vscode://ccm.hub/session?path=" & UrlEncode(folder)
 
-' If VS Code isn't running, open a window and give it time to load + activate
-' the extension (which also activates onStartupFinished) before firing the URI.
-If Not CodeRunning() Then
+Dim logf, hasWin
+logf = sh.ExpandEnvironmentStrings("%TEMP%") & "\claude-hub-debug.log"
+Log "START folder=" & folder
+Log "code exe=" & code
+
+hasWin = CodeWindowOpen()
+Log "CodeWindowOpen (before) = " & hasWin
+
+' If no real VS Code WINDOW exists (background processes don't count), open a NEW
+' window (-n forces one even when leftover processes linger), wait for the window
+' + extension host to be ready, then fire the URI.
+If Not hasWin Then
+  Log "opening new VS Code window (-n)"
   If code <> "" Then
-    sh.Run """" & code & """", 1, False
+    sh.Run """" & code & """ -n", 1, False
   Else
-    sh.Run "cmd /c code", 0, False
+    sh.Run "cmd /c code -n", 0, False
   End If
-  ' wait for the process to appear, then a bit more for the workbench to be ready
   Dim waited
   waited = 0
-  Do While (Not CodeRunning()) And (waited < 20000)
-    WScript.Sleep 250
-    waited = waited + 250
+  Do While (Not CodeWindowOpen()) And (waited < 25000)
+    WScript.Sleep 700
+    waited = waited + 700
   Loop
-  WScript.Sleep 4000
+  Log "window appeared after ~" & waited & "ms; waiting 6s for extension host"
+  WScript.Sleep 6000
 End If
 
+Log "firing URI: " & uri
 If code <> "" Then
   sh.Run """" & code & """ --open-url """ & uri & """", 0, False
 Else
   sh.Run "cmd /c code --open-url """ & uri & """", 0, False
 End If
+Log "DONE"
 
-' --- is any Code.exe process alive? ---
-Function CodeRunning()
-  Dim wmi, procs
-  On Error Resume Next
-  Set wmi = GetObject("winmgmts:\\.\root\cimv2")
-  Set procs = wmi.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name='Code.exe'")
-  If Err.Number <> 0 Then
-    CodeRunning = True   ' if WMI fails, assume running (avoid opening extra windows)
-    Err.Clear
-    Exit Function
-  End If
-  CodeRunning = (procs.Count > 0)
+' True only if a visible, titled VS Code window exists (via hub-has-window.ps1,
+' run hidden so there is no console flicker).
+Function CodeWindowOpen()
+  Dim ps1, cmd, rc
+  ps1 = fso.GetParentFolderName(WScript.ScriptFullName) & "\hub-has-window.ps1"
+  cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File """ & ps1 & """"
+  rc = sh.Run(cmd, 0, True)   ' 0 = hidden window, True = wait for exit code
+  CodeWindowOpen = (rc = 0)
 End Function
+
+Sub Log(msg)
+  Dim f, ts
+  On Error Resume Next
+  ts = Now
+  Set f = fso.OpenTextFile(logf, 8, True)   ' 8=append, create if missing
+  f.WriteLine ts & "  " & msg
+  f.Close
+End Sub
 
 ' --- UTF-8 percent-encoding (handles spaces, backslashes, Hebrew) ---
 Function UrlEncode(ByVal s)
