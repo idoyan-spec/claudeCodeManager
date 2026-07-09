@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-09 v3 status-icons
+# BUILD: 2026-07-09 v4 startup-glyph
 #
 # Title format:  "<model square> <status> <folder>"   e.g.  "⬛ ⟳ claudeCodeManager"
 #

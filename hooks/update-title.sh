@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook script.
-# BUILD: 2026-07-09 v3 status-icons
+# BUILD: 2026-07-09 v4 startup-glyph
 #
 # Reads JSON from stdin ({ session_id, transcript_path, cwd, prompt, ... }) and
 # sets the tab title to "<model square> <status> <folder>". The user just
@@ -41,8 +41,9 @@ printf '[%s] update-title cwd=%s session=%s title=%s\n' \
   "$(date '+%Y-%m-%d %H:%M:%S')" "$(pwd)" "$session_id" "$title" >> "$LOG" 2>/dev/null
 
 # Apply the title (cheap OSC in VS Code, PowerShell helper elsewhere).
+# `|| true` guards the `set -e` above: a failed repaint must never fail a prompt.
 source "$HOME/.claude/skills/session-behavior/scripts/_apply-title.sh"
-apply_tab_title "$title"
+apply_tab_title "$title" || true
 
 # Output nothing to stdout (so we don't pollute Claude's context).
 exit 0

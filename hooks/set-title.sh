@@ -1,15 +1,16 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-09 v3 status-icons
+# BUILD: 2026-07-09 v4 startup-glyph
 #
 # Usage:
-#   set-title.sh                        -> "<model> <dirname>"  (SessionStart hook)
+#   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)
 #   set-title.sh "topic words"          -> "<dirname> - topic words"
 #                                          and persists topic for the current session
 #   set-title.sh --session <id> "topic" -> persist under specific session id
 #
-# On SessionStart there is no status yet - a fresh session is neither working
-# nor waiting - so the title carries only the model square and the folder.
+# A fresh session is idle and waiting for you to type - the same state the Stop
+# hook reports - so SessionStart paints "✓", not a blank status. Leaving it
+# blank made every tab in a reopened window look unarmed until its first prompt.
 
 dirname=$(basename "$(pwd)")
 
@@ -45,10 +46,10 @@ fi
 if [ -n "$topic" ]; then
   title="$dirname - $topic"
 else
-  # A resumed session already has assistant turns, so the model is known.
-  # A fresh one does not - that is fine, the square appears after the first turn.
+  # A resumed session already has assistant turns, so the transcript names the
+  # model. A fresh one falls back to the configured model inside this helper.
   ccm_refresh_model_glyph "$session_id" "$(ccm_transcript_path "$INPUT")" || true
-  title=$(ccm_title "" "$session_id" "$dirname")
+  title=$(ccm_title "✓" "$session_id" "$dirname")
 fi
 
 # Debug log so we can confirm the hook fired.

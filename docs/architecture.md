@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 v3 status-icons`
+**Build:** `2026-07-09 v4 startup-glyph`
 
 ## Three problems, three fixes
 
@@ -60,6 +60,13 @@ transcript (`transcript_path`, supplied to every hook on stdin) and caches its
 square under `~/.claude/skills/session-behavior/models/<session_id>.txt`. The
 sidechain filter matters: a Haiku subagent must not repaint an Opus session's tab.
 
+A session that has not answered yet has no assistant turn, so the transcript
+cannot name its model. `ccm_configured_model` then falls back to the top-level
+`"model"` key of `.claude/settings.local.json`, `.claude/settings.json`, and
+`~/.claude/settings.json`, in that order — nearest scope wins. The transcript
+still takes precedence whenever it has an answer, so `/model` keeps overriding
+the configured default.
+
 The `Stop` hook re-reads the model on every turn, so a `/model` switch shows up
 immediately. Other hooks read the cache.
 
@@ -112,8 +119,16 @@ This environment must not cost significant resources or add attack surface:
   update — nothing else breaks, the session runs normally.
 - `ccm.ps1` also sets the folder-name title itself at launch, so a tab is named
   even before the first hook fires.
-- If the transcript holds no assistant turn yet (the first prompt of a fresh
-  session), the model square is simply omitted: `⟳ <folder>`. The square appears
-  from the next turn on. `ccm_refresh_model_glyph` returns non-zero in that case,
-  so every caller guards it with `|| true` — `update-title.sh` runs under
-  `set -e` and would otherwise abort before setting any title at all.
+- A fresh session paints `<square> ✓ <folder>` at `SessionStart`: idle-and-waiting
+  is the same state `Stop` reports. Before `v4` the status was left blank and the
+  square was omitted until the first assistant turn, so every tab in a reopened
+  VS Code window looked unarmed until you typed into it.
+- `ccm_refresh_model_glyph` still returns non-zero when *neither* the transcript
+  nor the config names a model with a square (an unrecognised model id). It never
+  caches an empty glyph, or the retry on the next hook would be skipped. Every
+  caller guards it with `|| true` — `update-title.sh` runs under `set -e` and
+  would otherwise abort before setting any title at all.
+- `apply_tab_title` always returns 0, and `update-title.sh` calls it with
+  `|| true`. A `-w /dev/tty` test is not sufficient: with no controlling terminal
+  the device is writable yet `open(2)` fails with `ENXIO`. The title is cosmetic
+  and must never fail a prompt.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: build the tab title "<model> <status> <folder>".
-# BUILD: 2026-07-09 v3 status-icons
+# BUILD: 2026-07-09 v4 startup-glyph
 #
 # Why the model lives in the TITLE and not in the tab colour:
 #   VS Code freezes a terminal's icon and colour at creation time -
@@ -15,6 +15,12 @@
 # The model is read from the session transcript: the last non-sidechain
 # assistant turn. Sidechains are subagents, which may run a different model -
 # a Haiku subagent must not repaint the tab of an Opus session.
+#
+# A session that has not answered yet has no assistant turn, so the transcript
+# cannot name the model. Fall back to the configured model in settings.json
+# (project first, then user), otherwise a fresh tab stays blank until the first
+# reply lands. The transcript still wins whenever it has an answer, so `/model`
+# switches keep overriding the config.
 
 CCM_MODEL_DIR="$HOME/.claude/skills/session-behavior/models"
 
@@ -42,21 +48,48 @@ ccm_transcript_path() {
   ccm_json_str "$1" transcript_path | sed 's|\\\\|/|g; s|\\|/|g'
 }
 
+# ccm_configured_model  ->  the "model" setting, nearest scope first
+#
+# Only a top-level `"model": "<id>"` matches: the leading quote keeps the
+# pattern off sibling keys such as "advisorModel".
+ccm_configured_model() {
+  local f m
+  for f in "$(pwd)/.claude/settings.local.json" \
+           "$(pwd)/.claude/settings.json" \
+           "$HOME/.claude/settings.json"; do
+    [ -f "$f" ] || continue
+    m=$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" 2>/dev/null \
+      | head -1 \
+      | sed 's/.*:[[:space:]]*"\(.*\)"$/\1/')
+    if [ -n "$m" ]; then printf '%s' "$m"; return 0; fi
+  done
+  return 1
+}
+
 # ccm_refresh_model_glyph <session_id> <transcript_path>
-# Re-reads the model from the transcript and caches its glyph. Silent no-op if
-# the transcript is missing or holds no assistant turn yet.
+# Caches the glyph for the session's model: the transcript's last assistant turn
+# when there is one, else the configured model. Silent no-op when neither names
+# a model we have a square for - the cache stays empty and a later call retries.
 ccm_refresh_model_glyph() {
-  local sid="${1:-default}" tp="$2" model
-  [ -n "$tp" ] && [ -f "$tp" ] || return 1
-  model=$(tail -c 400000 "$tp" 2>/dev/null \
-    | grep '"type":"assistant"' \
-    | grep -v '"isSidechain":true' \
-    | tail -1 \
-    | grep -o '"model":"[^"]*"' | tail -1 \
-    | sed 's/.*:"\(.*\)"$/\1/')
+  local sid="${1:-default}" tp="$2" model="" glyph
+  if [ -n "$tp" ] && [ -f "$tp" ]; then
+    model=$(tail -c 400000 "$tp" 2>/dev/null \
+      | grep '"type":"assistant"' \
+      | grep -v '"isSidechain":true' \
+      | tail -1 \
+      | grep -o '"model":"[^"]*"' | tail -1 \
+      | sed 's/.*:"\(.*\)"$/\1/')
+  fi
+  [ -n "$model" ] || model=$(ccm_configured_model) || true
   [ -n "$model" ] || return 1
+
+  # Never cache an empty glyph: an unknown model id must not look like a
+  # resolved one, or the retry on the next hook would be skipped.
+  glyph=$(ccm_model_to_glyph "$model")
+  [ -n "$glyph" ] || return 1
+
   mkdir -p "$CCM_MODEL_DIR" 2>/dev/null
-  printf '%s' "$(ccm_model_to_glyph "$model")" > "$CCM_MODEL_DIR/$sid.txt"
+  printf '%s' "$glyph" > "$CCM_MODEL_DIR/$sid.txt"
 }
 
 # ccm_model_glyph <session_id>  ->  the cached glyph (or nothing)

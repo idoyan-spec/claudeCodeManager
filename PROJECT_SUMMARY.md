@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 v3 status-icons`
+**גרסה / Build:** `2026-07-09 v4 startup-glyph`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -68,6 +68,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-09 | **טאב חדש נצבע מיד (`v4 startup-glyph`):** סשן טרי לא ענה עדיין, ולכן ה-transcript לא יודע מה המודל — נוסף `ccm_configured_model` שנופל חזרה ל-`"model"` מ-settings.json (פרויקט ואז משתמש), ו-`set-title.sh` צובע `✓` כבר ב-SessionStart במקום סטטוס ריק. לפני כן כל טאב בחלון VS Code שנפתח מחדש נראה ריק עד הפרומפט הראשון. בנוסף: `apply_tab_title` תמיד מחזיר 0 ו-`update-title.sh` עוטף ב-`|| true` (רץ תחת `set -e`), ו-`[ -w /dev/tty ]` הוחלף — בלי טרמינל שולט המכשיר "כתיב" אבל `open(2)` נכשל ב-`ENXIO` |
 | 2026-07-09 | **סטטוס + מודל על הטאב:** `_model-glyph.sh` חדש (מודל מה-transcript, סינון sidechain, מטמון לפי session), כותרת `<ריבוע-מודל> <סטטוס> <תיקייה>`, נוריות ⟳/✓/‼, מסגרת על הטאב הפעיל; `.gitattributes` שמכריח LF ב-`*.sh` (autocrlf שבר את ההתקנה במחשב שני); `install.ps1` מפיץ הוקים במקום רק לבדוק אותם, ולא כופה יותר `tabs.location=right` |
 | 2026-07-09 | **כניסה בקליק אחד מ-Explorer:** תוסף `ccm-hub` (URI handler פותח טרמינל חדש בחלון הקיים — במקום SendKeys שביר), תפריט לחיצה-ימנית נייד (HKCU, ללא admin) עם מפעילי VBS ללא הבהוב, רשימת טאבים הועברה שמאלה, עברית כברירת-מחדל במקלדת |
 | 2026-07-07 | גרסה ראשונה: משגר `ccm`, מתקין, הגדרות VS Code, סטטוס בהוקים (⚙/✅/🔔), מסלול OSC ל-VS Code + fallback ל-PowerShell, תיעוד + repo פרטי |
