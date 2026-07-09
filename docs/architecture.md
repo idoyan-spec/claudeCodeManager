@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 v6 no-api-name`
+**Build:** `2026-07-09 v7 opus-yellow`
 
 ## Three problems, three fixes
 
@@ -18,7 +18,7 @@
 
 ## The title: `<model> <status> <folder>`
 
-Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is currently working.
+Example: `🟨 ⟳ claudeCodeManager` — an Opus session that is currently working.
 
 | Event (hook)            | Status glyph | State        |
 |-------------------------|--------------|--------------|
@@ -30,7 +30,7 @@ Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is currently worki
 
 | Model  | Square |
 |--------|--------|
-| Opus   | `⬛`   |
+| Opus   | `🟨`   |
 | Fable  | `🟦`   |
 | Haiku  | `🟥`   |
 | Sonnet | `🟩`   |
@@ -109,6 +109,7 @@ every OSC title the hooks write afterwards is discarded.
 The symptom was maximally confusing, because everything *else* worked. The
 sparkle icon appeared, the active-tab border appeared, and `GetConsoleTitle` on
 the live shell returned exactly `⬛ ✓ קליקיט` — yet the tab read `קליקיט`.
+(Opus was `⬛` back then; it became `🟨` in v7. The quotes above are verbatim.)
 Meanwhile a plain `Ctrl+Shift+5` terminal in the same window, created with no
 Api name, rendered `🟥 ✓ הקלטה לקלוד` correctly. That contrast is the proof.
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-09 v6 no-api-name
+# BUILD: 2026-07-09 v7 opus-yellow
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)

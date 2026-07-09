@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-09 v6 no-api-name`
+**Build:** `2026-07-09 v7 opus-yellow`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -51,7 +51,7 @@ Each becomes a row in the vertical tab list, named by its folder, with a live st
 
 ## The tab title: `<model> <status> <folder>`
 
-Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is working.
+Example: `🟨 ⟳ claudeCodeManager` — an Opus session that is working.
 
 | Glyph | Meaning | Hook that sets it |
 |-------|---------|-------------------|
@@ -61,7 +61,7 @@ Example: `⬛ ⟳ claudeCodeManager` — an Opus session that is working.
 
 | Square | Model |
 |--------|-------|
-| `⬛` | Opus |
+| `🟨` | Opus |
 | `🟦` | Fable |
 | `🟥` | Haiku |
 | `🟩` | Sonnet |

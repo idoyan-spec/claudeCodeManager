@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-09 v6 no-api-name
+// ccm-hub  |  BUILD: 2026-07-09 v7 opus-yellow
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI. No SendKeys, no focus games — the Terminal API.
 //

@@ -1,8 +1,8 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-09 v6 no-api-name
+# BUILD: 2026-07-09 v7 opus-yellow
 #
-# Title format:  "<model square> <status> <folder>"   e.g.  "⬛ ⟳ claudeCodeManager"
+# Title format:  "<model square> <status> <folder>"   e.g.  "🟨 ⟳ claudeCodeManager"
 #
 # Called with a STATE argument that maps to a status glyph:
 #   working    -> "⟳"   Claude is busy (PostToolUse)

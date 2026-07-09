@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 v6 no-api-name`
+**גרסה / Build:** `2026-07-09 v7 opus-yellow`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -33,9 +33,9 @@
 
 ## איך זה עובד (בקצרה)
 1. **קריאוּת:** `terminal.integrated.tabs.location: "left"` → רשימה אנכית שלא מתכווצת.
-2. **סטטוס + מודל:** ההוקים כותבים כותרת `"<ריבוע-מודל> <סטטוס> <תיקייה>"`, למשל `⬛ ⟳ claudeCodeManager`:
+2. **סטטוס + מודל:** ההוקים כותבים כותרת `"<ריבוע-מודל> <סטטוס> <תיקייה>"`, למשל `🟨 ⟳ claudeCodeManager`:
    `⟳` עובד (UserPromptSubmit/PostToolUse) · `✓` התור שלך (Stop) · `‼` דורש תשומת לב (Notification).
-   ריבועים: `⬛` Opus · `🟦` Fable · `🟥` Haiku · `🟩` Sonnet.
+   ריבועים: `🟨` Opus · `🟦` Fable · `🟥` Haiku · `🟩` Sonnet.
 3. **מאיפה המודל:** `_model-glyph.sh` קורא את התור האחרון של ה-assistant מה-transcript
    (מסנן sidechain, כדי שסאב-אייג'נט Haiku לא יצבע טאב של Opus) ומטמין את הריבוע לפי `session_id`.
    `Stop` קורא מחדש בכל תור, ולכן `/model` משתקף מיד.

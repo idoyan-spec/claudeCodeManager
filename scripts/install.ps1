@@ -8,12 +8,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 v6 no-api-name
+  BUILD: 2026-07-09 v7 opus-yellow
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 v6 no-api-name'
+$BUILD = '2026-07-09 v7 opus-yellow'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 

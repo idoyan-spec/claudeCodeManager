@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: build the tab title "<model> <status> <folder>".
-# BUILD: 2026-07-09 v6 no-api-name
+# BUILD: 2026-07-09 v7 opus-yellow
 #
 # Why the model lives in the TITLE and not in the tab colour:
 #   VS Code freezes a terminal's icon and colour at creation time -
@@ -10,7 +10,7 @@
 #   `terminal.integrated.tabs.title: "${sequence}"`) is the only surface that
 #   can follow `/model` while a session is running.
 #
-#   Opus -> black    Fable -> blue    Haiku -> red    Sonnet -> green
+#   Opus -> yellow   Fable -> blue    Haiku -> red    Sonnet -> green
 #
 # The model is read from the session transcript: the last non-sidechain
 # assistant turn. Sidechains are subagents, which may run a different model -
@@ -30,7 +30,7 @@ ccm_model_to_glyph() {
     *fable*)  printf '🟦' ;;
     *haiku*)  printf '🟥' ;;
     *sonnet*) printf '🟩' ;;
-    *opus*)   printf '⬛' ;;
+    *opus*)   printf '🟨' ;;
     *)        printf ''   ;;
   esac
 }
