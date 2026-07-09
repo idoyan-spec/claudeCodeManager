@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
+# BUILD: 2026-07-09 21:10 v10 tab-bell
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)

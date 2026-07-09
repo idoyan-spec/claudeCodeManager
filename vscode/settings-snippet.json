@@ -1,5 +1,5 @@
 {
-  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 18:20 v9 active-tab-and-idle).",
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 21:10 v10 tab-bell).",
   "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
 
   "//tabs": "Show a vertical tab list on the LEFT side of the terminal panel - it never shrinks like horizontal tabs.",
@@ -13,9 +13,16 @@
 
   "//active": "Make the selected terminal unmistakable. `terminal.tab.activeBorder` is the ONLY terminal-tab-specific colour VS Code has, and it is a thin line - the row's fill comes from the GLOBAL list colours below, which also tint the Explorer/Search selection. That is the trade.",
   "//active2": "inactiveSelection* is the one that matters: while you type in the terminal, the tab list is unfocused, so the selected row is drawn as an *inactive* selection.",
+  "//active3": "The blue fill tracks the list SELECTION, which VS Code clears when you click the empty area below the tabs. The 1px `is-active` bar is the only marker tied to the actually-active terminal, so it is bright red - it is what survives.",
   "terminal.integrated.tabs.showActiveTerminal": "always",
+
+  "//bell": "A terminal that receives BEL gets a timed status icon on ITS OWN tab: statusList.add({id:'bell',severity:Warning,icon:bell}, bellDuration). list.warningForeground paints that icon.",
+  "terminal.integrated.enableVisualBell": true,
+  "terminal.integrated.bellDuration": 3000,
+
   "workbench.colorCustomizations": {
-    "terminal.tab.activeBorder": "#ffb300",
+    "terminal.tab.activeBorder": "#ff1a1a",
+    "list.warningForeground": "#ff4d4d",
     "list.activeSelectionBackground": "#0a4a75",
     "list.activeSelectionForeground": "#ffffff",
     "list.inactiveSelectionBackground": "#0a4a75",

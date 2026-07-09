@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-09 18:20 v9 active-tab-and-idle`
+**Build:** `2026-07-09 21:10 v10 tab-bell`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each

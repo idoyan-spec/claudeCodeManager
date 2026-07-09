@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
+// ccm-hub  |  BUILD: 2026-07-09 21:10 v10 tab-bell
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI. No SendKeys, no focus games — the Terminal API.
 //

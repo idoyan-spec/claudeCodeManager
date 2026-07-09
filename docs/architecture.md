@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 18:20 v9 active-tab-and-idle`
+**Build:** `2026-07-09 21:10 v10 tab-bell`
 
 ## Three problems, three fixes
 
@@ -171,6 +171,50 @@ avoided the override; `Ctrl` was chosen because it is easier to reach.
 same two commands.
 
 Settings and keybindings are both watched live: a focus change needs no reload.
+
+## Flashing the tab that needs you
+
+VS Code turns a **BEL byte** into a timed, per-tab status icon:
+
+```js
+onBell(() => { if (enableVisualBell) statusList.add({id:'bell', severity:Warning, icon:bell}, bellDuration) })
+```
+
+So the tab of the session that wants you flashes, and only that tab.
+`terminal.integrated.enableVisualBell: true`, `bellDuration: 3000`, and
+`list.warningForeground` paints the icon red.
+
+**A hook cannot ring it.** Hooks get piped stdio and no controlling terminal, so
+they cannot put a byte on the pty — the same constraint that makes the title go
+through `SetConsoleTitle`. Attaching to the console from outside and calling
+`WriteConsoleW("\a")` does return success, but conhost treats BEL as a beep
+rather than screen content and does not forward it to the pty. Dead end.
+
+**Claude Code can ring it**, because its stdout *is* the pty. Setting
+`preferredNotifChannel: "terminal_bell"` in `~/.claude/settings.json` makes it
+emit BEL on `permission_prompt` and on `idle_prompt`. Read at **startup**, so it
+only applies to sessions opened afterwards.
+
+That pairing is deliberate: the glyph still separates the two states (`‼` vs `✓`),
+while the flash fires for both — Claude wants something, or Claude has been
+waiting for you a while. It does not fire the instant `Stop` lands, which is the
+right behaviour: no flash while you are already looking at the session.
+
+## Which tab is active, really
+
+`.terminal-tabs-entry.is-active:before { width: 1px; background-color: var(--vscode-terminal-tab-activeBorder) }`
+
+That 1px bar is the **only** marker bound to the active terminal, and its width
+is hardcoded in the stylesheet. The blue row fill everyone reaches for comes from
+`.monaco-list-row.selected`, i.e. the list **selection** — a different concept.
+VS Code clears that selection when you click the empty area under the tabs, and
+restores it only when the active instance next changes. So the fill disappears
+while the terminal is still active.
+
+Hence: the bar is bright red (`#ff1a1a`) because it is what always survives; the
+blue fill is a bonus that is present most of the time. Widening the bar needs CSS
+injection via a third-party loader that patches the workbench and trips VS Code's
+"installation corrupt" warning — rejected, it violates the light+safe constraint.
 
 ## Why Claude Code's own title is disabled
 

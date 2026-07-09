@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
+# install-extension.ps1  |  BUILD: 2026-07-09 21:10 v10 tab-bell
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #

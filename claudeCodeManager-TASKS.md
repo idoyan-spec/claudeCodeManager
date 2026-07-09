@@ -18,6 +18,9 @@
 
 ## הושלמו
 
+✓ [2026-07-09 21:10] הטאב מהבהב באדום כשהסשן מבקש אישור או ממתין לך: `preferredNotifChannel: terminal_bell` (Claude כותב BEL ל-pty; הוק לא יכול — אין לו tty) + `enableVisualBell`/`bellDuration`/`list.warningForeground`
+✓ [2026-07-09 21:10] הקו של הטאב הפעיל אדום זוהר ולא נעלם: `.is-active:before` הוא הסימן היחיד שקשור לטרמינל הפעיל; הרקע הכחול תלוי בבחירה ברשימה ומתאפס בלחיצה על שטח ריק
+✓ [2026-07-09 21:10] תוקן באג במתקין: מיזוג `keybindings.json` שכפל את כל הקיצורים ושמר מערך עטוף (`{value,Count}`) — unroll מפורש + סינון + כתיבה ללא BOM
 ✓ [2026-07-09 18:20] `‼` הפסיק לשקר: `Notification` נורה גם על idle של 60 שניות, ולכן כל `✓` הפך ל-`‼` אחרי דקה. `restore-title.sh` מוריד idle ל-`✓` (לפי `notification_type`, ובנפילה לפי `message`); התראה לא-מוכרת נשארת `‼`
 ✓ [2026-07-09 18:20] הטאב הנבחר בולט: רקע כחול מלא + טקסט לבן + קו ענבר. `terminal.tab.activeBorder` הוא הצבע היחיד שקיים לטאבי טרמינל, ולכן הרקע מגיע מ-`list.*Selection*` הגלובליים (משפיע גם על Explorer — מכוון)
 ✓ [2026-07-09 17:53] פוקוס מיידי על שורת הכתיבה: לחיצה אחת על טאב (`tabs.focusMode: singleClick`), `↑/↓` ברשימת הטאבים (`runCommands`: `list.focusDown`+`list.select`+`terminal.focus`), `Ctrl+↑/↓` בתוך טרמינל (`focusNext`/`focusPrevious`). הפוקוס יחיד — לכן חצים-בלבד עובדים רק מהרשימה, ובתוך טרמינל צריך מקש-צירוף

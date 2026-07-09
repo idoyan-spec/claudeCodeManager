@@ -9,12 +9,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 18:20 v9 active-tab-and-idle
+  BUILD: 2026-07-09 21:10 v10 tab-bell
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 18:20 v9 active-tab-and-idle'
+$BUILD = '2026-07-09 21:10 v10 tab-bell'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 
@@ -53,6 +53,8 @@ $want = [ordered]@{
     'terminal.integrated.tabs.showActiveTerminal'  = 'always'
     'terminal.integrated.tabs.focusMode'           = 'singleClick'
     'terminal.integrated.enablePersistentSessions' = $true
+    'terminal.integrated.enableVisualBell'         = $true
+    'terminal.integrated.bellDuration'             = 3000
 }
 
 # Merged separately: colorCustomizations is a nested object owned by the user,
@@ -64,7 +66,8 @@ $want = [ordered]@{
 # inactiveSelection* is the load-bearing one: while you type in the terminal the
 # tab list is unfocused, so the selected row renders as an INACTIVE selection.
 $wantColors = @{
-    'terminal.tab.activeBorder'        = '#ffb300'
+    'terminal.tab.activeBorder'        = '#ff1a1a'
+    'list.warningForeground'           = '#ff4d4d'
     'list.activeSelectionBackground'   = '#0a4a75'
     'list.activeSelectionForeground'   = '#ffffff'
     'list.inactiveSelectionBackground' = '#0a4a75'
@@ -128,6 +131,24 @@ if (Test-Path $claudeSettings) {
         Write-Host "[3/4] WARNING: CLAUDE_CODE_DISABLE_TERMINAL_TITLE not found in ~/.claude/settings.json" -ForegroundColor Yellow
         $ok = $false
     }
+
+    # The tab flash needs a BEL byte on the pty. A hook cannot write one - it has
+    # no controlling terminal. Claude Code can, because its stdout IS the pty.
+    # Read at startup only, so it lands on the NEXT session.
+    if ($cs -match '"preferredNotifChannel"\s*:\s*"terminal_bell"') {
+        Write-Host "[3/4] preferredNotifChannel = terminal_bell - OK" -ForegroundColor Green
+    } else {
+        try {
+            $cj = $cs | ConvertFrom-Json -ErrorAction Stop
+            Copy-Item -LiteralPath $claudeSettings -Destination "$claudeSettings.ccm-backup-$((Get-Date).ToString('yyyyMMdd-HHmmss'))" -Force
+            $cj | Add-Member -NotePropertyName 'preferredNotifChannel' -NotePropertyValue 'terminal_bell' -Force
+            ($cj | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $claudeSettings -Encoding UTF8
+            Write-Host "[3/4] Set preferredNotifChannel = terminal_bell (takes effect in a NEW session)." -ForegroundColor Green
+        } catch {
+            Write-Host "[3/4] WARNING: could not set preferredNotifChannel in ~/.claude/settings.json" -ForegroundColor Yellow
+            $ok = $false
+        }
+    }
 } else {
     Write-Host "[3/4] WARNING: ~/.claude/settings.json not found" -ForegroundColor Yellow
     $ok = $false
@@ -142,8 +163,23 @@ foreach ($f in 'set-title.sh','update-title.sh','restore-title.sh','_apply-title
 # --- 4. Merge the terminal focus keybindings -------------------------------
 # Matched on key+command+when, so re-running never appends a duplicate and a
 # binding the user re-pointed at another command is left alone.
+#
+# Two traps, both hit for real:
+#   * `@($raw | ConvertFrom-Json)` does NOT reliably unroll a JSON array - it can
+#     hand back the array as a SINGLE object. That object has no `.key`, so the
+#     dedupe matched nothing, all four bindings were appended, and the array got
+#     re-serialised as `{"value":[...],"Count":4}` inside the file. Unroll with
+#     a foreach and keep only elements that actually look like a keybinding.
+#   * `Set-Content -Encoding UTF8` writes a BOM in Windows PowerShell. Write the
+#     file with a no-BOM UTF8 encoder instead.
 $kbPath    = Join-Path $env:APPDATA 'Code\User\keybindings.json'
 $kbSnippet = Join-Path $root 'vscode\keybindings-snippet.json'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-JsonFile([string]$Path, $Value) {
+    $json = ConvertTo-Json -InputObject @($Value) -Depth 10
+    [System.IO.File]::WriteAllText($Path, $json, $utf8NoBom)
+}
 
 $wantKb = @(
     [pscustomobject]@{ key = 'ctrl+down'; command = 'workbench.action.terminal.focusNext';     when = 'terminalFocus && !terminalTabsFocus' }
@@ -156,15 +192,22 @@ $wantKb = @(
 
 if (-not (Test-Path $kbPath)) {
     New-Item -ItemType File -Path $kbPath -Force | Out-Null
-    ($wantKb | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $kbPath -Encoding UTF8
+    Write-JsonFile $kbPath $wantKb
     Write-Host "[4/4] Created keybindings.json with the terminal focus bindings." -ForegroundColor Green
 } else {
-    $kbRaw = Get-Content -LiteralPath $kbPath -Raw -ErrorAction SilentlyContinue
+    $kbRaw = (Get-Content -LiteralPath $kbPath -Raw -ErrorAction SilentlyContinue) -replace "^﻿", ''
     $existing = $null
     if ([string]::IsNullOrWhiteSpace($kbRaw)) {
         $existing = @()
     } else {
-        try { $existing = @($kbRaw | ConvertFrom-Json -ErrorAction Stop) } catch { $existing = $null }
+        try {
+            $parsed = ConvertFrom-Json -InputObject $kbRaw -ErrorAction Stop
+            # Unroll explicitly, and drop anything that is not a keybinding object.
+            $existing = @()
+            foreach ($e in @($parsed)) {
+                if ($null -ne $e -and $e.PSObject.Properties.Name -contains 'key') { $existing += $e }
+            }
+        } catch { $existing = $null }
     }
 
     if ($null -eq $existing) {
@@ -179,7 +222,7 @@ if (-not (Test-Path $kbPath)) {
             $dup = $existing | Where-Object { $_.key -eq $kb.key -and $_.command -eq $kb.command -and $_.when -eq $kb.when }
             if (-not $dup) { $existing += $kb; $added++ }
         }
-        ($existing | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $kbPath -Encoding UTF8
+        Write-JsonFile $kbPath $existing
         Write-Host "[4/4] Merged $added keybinding(s) into keybindings.json." -ForegroundColor Green
     }
 }
