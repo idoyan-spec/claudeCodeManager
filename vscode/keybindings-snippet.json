@@ -1,4 +1,4 @@
-// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-09 21:10 v10 tab-bell).
+// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-09 22:31 v12 panel-top).
 // Merge into your VS Code keybindings.json. install.ps1 does it for you (with a backup).
 //
 // Goal: the caret should land on the prompt line of the session you moved to,
@@ -10,10 +10,22 @@
 //     because onDidOpen honours preserveFocus and may skip the focus call.
 //     After this the list no longer has focus - that is the point.
 //
-//   * You are IN a terminal: Ctrl+Arrow switches session and never leaves the
-//     prompt line. This overrides the default scrollToPreviousCommand /
-//     scrollToNextCommand (Ctrl+Up/Down when terminalFocus), a shell-integration
-//     feature that does nothing useful inside Claude Code's fullscreen TUI.
+//   * You are IN a terminal: Ctrl+Arrow OR Alt+Arrow switches session and never
+//     leaves the prompt line. Both modifiers are bound to the same command so
+//     muscle memory cannot miss. Ctrl+Arrow overrides the default
+//     scrollToPreviousCommand / scrollToNextCommand, a shell-integration feature
+//     that does nothing useful inside Claude Code's fullscreen TUI. Alt+Arrow was
+//     unbound in the terminal, so it costs nothing.
+//
+// Why these keys reach VS Code at all: a keypress in a terminal is forwarded to
+// the shell UNLESS the command it resolves to is listed in the default
+// `terminal.integrated.commandsToSkipShell` (159 entries). Verified in the 1.128
+// bundle: focusNext and focusPrevious are both on that list. A command that is
+// NOT on it - e.g. `runCommands` - must therefore never be bound to a key whose
+// `when` can be true while the terminal has focus, or the keystroke is swallowed.
+//
+// FYI, VS Code already ships Ctrl+PageDown / Ctrl+PageUp for the same two
+// commands (default `primary: 2060` = 2048 Ctrl | 12 PageDown). Left untouched.
 //
 // A single click on a tab is handled by settings, not here:
 //   "terminal.integrated.tabs.focusMode": "singleClick"
@@ -25,6 +37,16 @@
   },
   {
     "key": "ctrl+up",
+    "command": "workbench.action.terminal.focusPrevious",
+    "when": "terminalFocus && !terminalTabsFocus"
+  },
+  {
+    "key": "alt+down",
+    "command": "workbench.action.terminal.focusNext",
+    "when": "terminalFocus && !terminalTabsFocus"
+  },
+  {
+    "key": "alt+up",
     "command": "workbench.action.terminal.focusPrevious",
     "when": "terminalFocus && !terminalTabsFocus"
   },
