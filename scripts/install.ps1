@@ -8,12 +8,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 v4 startup-glyph
+  BUILD: 2026-07-09 v5 tty-first
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 v4 startup-glyph'
+$BUILD = '2026-07-09 v5 tty-first'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 

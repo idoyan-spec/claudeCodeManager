@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 v4 startup-glyph`
+**Build:** `2026-07-09 v5 tty-first`
 
 ## Three problems, three fixes
 
