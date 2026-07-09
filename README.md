@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-09 22:31 v12 panel-top`
+**Build:** `2026-07-10 00:31 v13 project-picker`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -28,6 +28,7 @@ Running one standalone terminal per project means:
 | Can't tell working vs waiting | A **status glyph** driven by Claude Code hooks: `⟳` working · `✓` your turn · `‼` needs you |
 | Can't tell which model a session runs | A **coloured square** read from the transcript - follows `/model` live |
 | Can't tell which tab is focused | `terminal.tab.activeBorder` paints a bright border on it |
+| Typing a path to open a project | **`Alt+O`** — a floating picker of every project, most recently used first |
 
 ## Quick start
 
@@ -35,14 +36,33 @@ Running one standalone terminal per project means:
 # 1. Install (registers the `ccm` command + merges VS Code terminal settings, with backup)
 E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 
-# 2. Open a NEW VS Code window (required - the title control is read at startup)
+# 2. Install the VS Code extension (gives you Alt+O and the right-click entry)
+powershell -ExecutionPolicy Bypass -File .\ccm-extension\install-extension.ps1
 
-# 3. In the VS Code terminal, start a project session:
-ccm E:\path\to\some\project
+# 3. Open a NEW VS Code window (required - the title control is read at startup)
+
+# 4. Press Alt+O and pick a project.  (Or type: ccm E:\path\to\some\project)
 ```
 
-Open more projects by opening a new terminal tab (`Ctrl+Shift+5`) and running `ccm` again.
-Each becomes a row in the vertical tab list, named by its folder, with a live status glyph.
+Each project becomes a row in the vertical tab list, named by its folder, with a
+live status glyph.
+
+## `Alt+O` — the project picker
+
+A floating list of every folder under `ccmHub.projectsRoot` (default
+`E:\MAIN_CLAUDE`), **ordered by when you last worked in it**. Type to filter,
+`Enter` to open: a new terminal starts Claude there and the picker closes. A
+project that is already running shows `● running` and is simply focused rather
+than opened twice.
+
+"Last worked in" is the later of two facts, so the order is right on the very
+first press and stays right no matter how a session was started:
+
+- the picker's own history of what you opened through it, and
+- the mtime of `~/.claude/projects/<encoded-cwd>/`, which Claude Code touches
+  whenever it actually runs in that folder.
+
+Configure with `ccmHub.projectsRoot` and `ccmHub.claudeCommand` in VS Code settings.
 
 - **New to VS Code? Start here (Hebrew):** [VSCODE_GUIDE.html](VSCODE_GUIDE.html) — screen map, terminal, shortcuts
 - **Full walk-through (Hebrew, non-technical):** [USER_GUIDE.html](USER_GUIDE.html) / [USER_GUIDE.md](USER_GUIDE.md)
@@ -86,6 +106,9 @@ claudeCodeManager/
 ├── vscode/
 │   ├── settings-snippet.json terminal settings to merge
 │   └── keybindings-snippet.json  terminal focus keys
+├── ccm-extension/ccm-hub/
+│   ├── extension.js          URI handler + the Alt+O picker
+│   └── projects.js           the "most recently used" ranking (pure Node, testable)
 ├── scripts/
 │   ├── ccm.ps1               the launcher
 │   └── install.ps1           idempotent installer

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: apply a tab title to the REAL terminal.
-# BUILD: 2026-07-09 22:31 v12 panel-top
+# BUILD: 2026-07-10 00:31 v13 project-picker
 #
 # Two paths, tried in order: an OSC write to /dev/tty, else the AttachConsole
 # helper (SetConsoleTitle; ConPTY forwards it to VS Code as `${sequence}`).

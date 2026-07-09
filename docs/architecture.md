@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 22:31 v12 panel-top`
+**Build:** `2026-07-10 00:31 v13 project-picker`
 
 ## Three problems, three fixes
 
@@ -278,6 +278,83 @@ Verified by running the installer three times against a sandboxed fake machine
 runs 2 and 3 report "already registered" and write nothing; the user's real
 `settings.json` stayed byte-identical throughout, and the emitted sound command
 executes through `bash -c` with exit 0.
+
+## The `Alt+O` project picker
+
+A `showQuickPick` over the immediate subdirectories of `ccmHub.projectsRoot`,
+ordered most-recently-used first. Choosing one opens a terminal there, runs
+`ccmHub.claudeCommand`, and the picker dismisses itself.
+
+### Where "most recently used" comes from
+
+Neither available source is sufficient alone, so `projects.js` takes `max()` of both:
+
+| Source | Knows about | Blind to |
+|---|---|---|
+| the extension's `globalState` MRU | folders opened through the picker | everything on a fresh install; sessions started by `ccm.ps1`, the Explorer menu, or a bare `claude` |
+| mtime of `~/.claude/projects/<encoded-cwd>/` | every folder Claude has actually run in | nothing — but it only moves when Claude runs |
+
+The second source is what makes the *very first* `Alt+O` already correct.
+
+### The encoding is one-way
+
+Claude derives a project's history-directory name from its absolute cwd by
+replacing every non-alphanumeric character with `-`. Measured on this machine:
+15 of 30 folders under `E:\MAIN_CLAUDE` matched exactly (the other 15 are folders
+Claude has never run in), with **zero collisions**. Because `\` and `/` both
+collapse to `-`, the separator style of the path we build does not matter.
+
+But the mapping is **lossy**: `הקלטה לקלוד` encodes to a bare run of dashes and
+cannot be decoded back. So it is only ever applied **forwards**, starting from a
+real folder found on disk. Do not try to reconstruct the project list by reading
+`~/.claude/projects` — two same-length non-ASCII names would be indistinguishable.
+(A transcript's `cwd` field does hold the true path, if a reverse lookup is ever
+genuinely needed.)
+
+### A directory's mtime lies about live sessions
+
+On NTFS a directory's mtime moves when a file is *created* or removed inside it,
+but **not** when an existing file is appended to — and a long Claude session is
+one long append to a single `.jsonl`. Ranking by directory mtime alone reported
+`8h ago` for a folder whose session was live *at that moment*; its transcript had
+been written 46 seconds earlier while the directory still read 8 hours old.
+`historyStamp()` therefore takes the newest mtime of the directory **and** every
+`.jsonl` in it. Cost measured at ~7 ms for 30 projects — cheap enough to do
+synchronously each time the picker opens, which keeps it always-fresh.
+
+### The keybinding would otherwise be swallowed
+
+A keypress while a terminal has focus is forwarded to the shell unless its command
+id appears in `terminal.integrated.commandsToSkipShell`. A custom command is never
+in VS Code's 159-entry default list, so `Alt+O` pressed inside a Claude session —
+the only place it matters — would go to PowerShell and the picker would never open.
+
+From the 1.128 bundle:
+
+```js
+let t = new Set(nit);                       // nit = the 159 defaults
+let i = e.commandsToSkipShell ?? [];
+for (…) { if (r[0] === "-") t.delete(r.slice(1)); else t.add(r); }
+```
+
+So the user's array is **merged into** the defaults (a `-` prefix removes an
+entry) and appending one id destroys nothing. The extension appends its own id in
+`activate()`, guarded by an `includes()` check. This is deliberately *not* done
+through the installer's settings merge: that merge overwrites a key wholesale and
+would silently drop any ids the user had added.
+
+`Alt+O` itself was chosen by grepping the bundle for keybinding codes
+(`Alt = 512`, `KeyO = 45` → `primary: 557`): **0** hits, versus 3 for `Alt+P`.
+It ships in the extension's `contributes.keybindings`, so it travels with the
+extension and needs no `keybindings.json` edit.
+
+### Testability
+
+`projects.js` deliberately does not `require('vscode')`. The ranking — the only
+part with real logic — is plain Node and is exercised directly against the live
+`~/.claude/projects` tree. `extension.js` is driven in tests through a stubbed
+`vscode` module, which is how the "never pass `name` to `createTerminal`"
+invariant below is guarded against regression.
 
 ## Why Claude Code's own title is disabled
 

@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-09 22:31 v12 panel-top`
+**גרסה / Build:** `2026-07-10 00:31 v13 project-picker`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -21,7 +21,8 @@
 | `hooks/_model-glyph.sh` | מזהה את המודל מה-transcript (סינון sidechain) ובונה את הכותרת `<ריבוע-מודל> <סטטוס> <תיקייה>` |
 | `.gitattributes` | מכריח LF ב-`*.sh` (autocrlf היה מוציא CRLF ב-clone, ו-bash דוחה shebang שנגמר ב-`\r`) |
 | `USER_GUIDE.md` / `USER_GUIDE.html` | חוברת הסבר למשתמש (עברית) |
-| `ccm-extension/ccm-hub/` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` שפותח טרמינל חדש בחלון הקיים ומריץ Claude |
+| `ccm-extension/ccm-hub/extension.js` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` + **בורר הפרויקטים ב-`Alt+O`**; פותח טרמינל חדש בחלון הקיים ומריץ Claude |
+| `ccm-extension/ccm-hub/projects.js` | דירוג "לפי מה שנכנסתי אליו לאחרונה" — Node טהור, ללא `vscode`, ולכן ניתן לבדיקה מחוץ ל-VS Code |
 | `ccm-extension/install-extension.ps1` | side-load של התוסף ל-`~/.vscode/extensions` (ללא npm/admin) |
 | `explorer-context-menu/launchers/*.vbs` | מפעילי wscript (ללא חלון קונסולה): `claude-hub.vbs` (יורה את ה-URI), `claude-terminal.vbs` (Windows Terminal+Claude) |
 | `explorer-context-menu/install-context-menu.ps1` | מתקין נייד לתפריט הימני (HKCU, ללא admin, מזהה VS Code) |
@@ -55,6 +56,26 @@
    `list.focusDown`+`list.select`+`terminal.focus`; `Ctrl+↑/↓` בטרמינל = `focusNext`/`focusPrevious`
    (דורס את `scrollToPrevious/NextCommand`, שלא רלוונטי ב-TUI של Claude).
 9. הכותרת של Claude עצמו מכובה ע"י `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` (נקרא בהפעלה).
+10. **בורר הפרויקטים (`Alt+O`):** QuickPick צף עם כל התיקיות תחת `ccmHub.projectsRoot`,
+    ממוין לפי `max(MRU של התוסף, mtime של `~/.claude/projects/<cwd-מקודד>/`)`. שני המקורות
+    נחוצים: ה-MRU מדויק אך ריק בהתקנה טרייה ועיוור לסשנים שנפתחו דרך `ccm.ps1` או תפריט
+    ה-Explorer; ה-mtime של Claude מתעדכן בכל הרצה אמיתית, בלי קשר לדרך ההפעלה.
+11. **הקידוד של Claude חד-כיווני:** cwd → שם תיקייה ע"י החלפת כל תו לא-אלפאנומרי ב-`-`.
+    אימות במחשב הזה: 15 מתוך 30 תיקיות נמצאו בדיוק (ה-15 האחרות — Claude מעולם לא רץ בהן),
+    0 התנגשויות. הקידוד **מאבד מידע** (`הקלטה לקלוד` → רצף מקפים), ולכן משתמשים בו **רק קדימה**,
+    מתיקייה אמיתית שנמצאה בדיסק. גם `\` וגם `/` הופכים ל-`-`, ולכן סגנון המפריד לא משנה.
+12. **mtime של תיקייה לא מספיק:** ב-NTFS ה-mtime של תיקייה זז כשנוצר בה קובץ, אבל **לא**
+    כשמוסיפים לקובץ קיים — וסשן Claude ארוך הוא הוספה אחת ארוכה ל-`.jsonl` בודד. לכן לוקחים
+    את ה-mtime החדש ביותר מבין התיקייה **והתמלילים שבה**. נמדד: תיקייה עם סשן **חי באותו רגע**
+    דיווחה `8h ago` לפי ה-mtime של התיקייה בלבד.
+13. **`Alt+O` חייב להיות ב-`commandsToSkipShell`:** הקשה בטרמינל בפוקוס נשלחת ל-shell אלא אם
+    מזהה הפקודה נמצא ברשימה, ופקודה מותאמת אישית אף פעם לא ברשימת 159 ברירות-המחדל — בלי זה
+    PowerShell היה בולע את הצירוף והחלון פשוט לא היה נפתח. אומת בחבילת 1.128:
+    `let t = new Set(defaults); … t.add(r)` — מערך המשתמש **ממוזג** לתוך ברירות המחדל
+    (קידומת `-` מסירה). התוסף מוסיף את המזהה באופן אידמפוטנטי ב-`activate()`, ולא דרך מיזוג
+    ההגדרות של המתקין — כי המתקין דורס מפתח **בשלמותו** והיה מוחק מזהים שהמשתמש הוסיף.
+14. **`Alt+O` פנוי:** 0 קישורים בחבילת 1.128 (לעומת `Alt+P` שיש לו 3), 0 בקובץ הקיצורים של
+    המשתמש, ולא מנמוניקה של תפריט. הקיצור נשלח עם התוסף (`contributes.keybindings`) ולכן נייד.
 
 ## איך להשתמש
 ### התקנה / הכנה
@@ -65,11 +86,11 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 
 ### הרצה
 1. לפתוח **חלון VS Code חדש** (חובה - כיבוי כותרת Claude נקרא בהפעלה).
-2. בטרמינל:
-   ```powershell
-   ccm E:\path\to\project
-   ```
-3. פרויקט נוסף = טאב טרמינל חדש (`Ctrl+Shift+5`) + `ccm` שוב.
+2. **`Alt+O`** → בורר צף עם כל הפרויקטים, האחרון שעבדת בו ראשון. Enter פותח והחלון נסגר.
+   פרויקט שכבר רץ מסומן `● running` ומקבל פוקוס במקום סשן שני.
+3. לחלופין, בטרמינל: `ccm E:\path\to\project` (טאב חדש: `Ctrl+Shift+5`).
+
+הגדרות: `ccmHub.projectsRoot` (ברירת מחדל `E:\MAIN_CLAUDE`), `ccmHub.claudeCommand`.
 
 ### פריסה (Deploy)
 לא רלוונטי - כלי מקומי. הפצה = repo פרטי ב-GitHub (`idoyan-spec`).
@@ -77,6 +98,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-10 | **בורר פרויקטים צף ב-`Alt+O` (`v13 project-picker`):** QuickPick עם כל התיקיות תחת `E:\MAIN_CLAUDE`, ממוין לפי מתי נכנסת אליהן לאחרונה; Enter פותח טרמינל עם Claude והחלון נסגר. (1) **המיון** הוא `max(MRU של התוסף, mtime של ההיסטוריה של Claude)` — ה-MRU לבדו ריק בהתקנה טרייה ועיוור ל-`ccm.ps1`/תפריט Explorer, וה-mtime לבדו לא יודע מה פתחת דרך הבורר. (2) **קידוד ה-cwd של Claude** (`[^a-zA-Z0-9]` → `-`) **מאבד מידע** — `הקלטה לקלוד` הופך לרצף מקפים ואי אפשר לפענח חזרה; לכן הוא משמש **רק קדימה**, מתיקייה אמיתית בדיסק. אומת: 15/30 התאמות מדויקות, 0 התנגשויות, ו-`\` מול `/` מקודדים זהה. (3) **mtime של תיקייה משקר**: ב-NTFS הוא זז ביצירת קובץ אך **לא** בהוספה לקובץ קיים, וסשן ארוך הוא הוספה אחת ל-`.jsonl` — נמדד שתיקייה עם סשן **חי באותו רגע** דיווחה `8h ago`. הפתרון: ה-mtime המקסימלי של התיקייה **ושל התמלילים**. (4) **הקיצור היה נבלע**: הקשה בטרמינל בפוקוס עוברת ל-shell אלא אם מזהה הפקודה ב-`commandsToSkipShell`, ופקודה מותאמת לעולם אינה ברשימת 159 ברירות-המחדל. אומת ב-1.128 שהמערך של המשתמש **ממוזג** לתוך ברירות המחדל (`new Set(defaults)` ואז `t.add`), ולכן התוסף מוסיף את עצמו אידמפוטנטית ב-`activate()` — **לא** דרך מיזוג ההגדרות של המתקין, שדורס מפתח בשלמותו. (5) `Alt+O` נבחר כי יש לו 0 קישורים בחבילה (ל-`Alt+P` יש 3). (6) פרויקט שכבר רץ מקבל פוקוס במקום סשן כפול. נבדק ב-hard harness עם `vscode` מזויף: 20 בדיקות עוברות, כולל שהבורר עדיין **לא** מעביר `name` ל-`createTerminal` |
 | 2026-07-09 | **`Alt` + פאנל עליון + התקנה ניידת באמת (`v11 alt-arrows`, `v12 panel-top`):** (1) `Alt+↑/↓` לא הגיבו כי **מעולם לא חוברו** — רק `Ctrl` היה. שניהם עכשיו מצביעים לאותה פקודה. אומת בחבילת 1.128 ש-`focusNext`/`focusPrevious` נמצאים ב-`commandsToSkipShell` (159 ערכים) — בלי זה הצירוף היה נבלע ע"י ה-shell ולא מגיע ל-VS Code כלל. (2) **הפאנל העליון**: `workbench.panel.position` נשמר **לכל workspace בנפרד** (`0=left 1=right 2=bottom 3=top`), אבל הדגל של התוסף ישב ב-`globalState` — ולכן רק התיקייה הראשונה אחרי ההתקנה זזה, וכל השאר נשארו למטה לנצח (נמדד: 4 מתוך 5 עם `=2`). עכשיו `workspaceState` בתוסף (0.0.4) + `workbench.panel.defaultLocation: "top"` להגדרות. (3) **המתקין לא היה נייד**: הוא העתיק את קבצי ההוקים ו**לא רשם אותם** ב-`settings.json` — כלומר אף אחד לא קרא להם; הוא רק **התלונן** על `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` במקום לכתוב אותו; והכתיבה היחידה שלו (`Set-Content -Encoding UTF8`) הוסיפה **BOM**. שלושתם תוקנו. הוק הצליל מוצא את תיקיית Windows דרך `[Environment]::GetFolderPath('Windows')` ו**בלי `$`** — ה-shell שמריץ הוקים מרחיב `$` (כך `$HOME` עובד), ולכן `$env:SystemRoot` היה נאכל. אומת על "מחשב מדומה" (USERPROFILE/APPDATA לתיקייה זמנית): הרצה 1 רושמת הכל, 2–3 לא נוגעות; ה-`settings.json` האמיתי נשאר זהה בית-בית |
 | 2026-07-09 | **הבהוב אדום על הטאב שצריך אותך (`v10 tab-bell`):** VS Code הופך תו BEL לאייקון סטטוס זמני על הטאב הספציפי (`enableVisualBell` + `bellDuration`, צבע מ-`list.warningForeground`). **הוק לא יכול לצלצל** — אין לו tty; `WriteConsoleW("\a")` דרך AttachConsole מצליח אבל conhost לא מעביר BEL ל-pty. **Claude כן יכול**, כי ה-stdout שלו הוא ה-pty: `preferredNotifChannel: "terminal_bell"` (נקרא בעליית סשן בלבד), יורה על `permission_prompt` ועל `idle_prompt`. בנוסף: `terminal.tab.activeBorder` → אדום זוהר, כי הוא הסימן **היחיד** הקשור לטרמינל הפעיל (`.is-active:before`, רוחב 1px קשיח ב-CSS); הרקע הכחול תלוי ב**בחירה ברשימה** ונעלם בלחיצה על השטח הריק. **תוקן באג במתקין:** `@($raw \| ConvertFrom-Json)` החזיר מערך כאובייקט **בודד**, ה-dedupe לא מצא `.key`, וכל ארבעת הקיצורים נוספו שוב — הקובץ נשמר כ-`{"value":[...],"Count":4}`. עכשיו יש unroll מפורש, סינון לפי `key`, וכתיבה ללא BOM. אומת: שתי הרצות רצופות → 4 קיצורים, 0 כפילויות |
 | 2026-07-09 | **טאב נבחר בולט + `‼` שהפסיק לשקר (`v9`):** (1) הרקע של השורה הנבחרת — `terminal.tab.activeBorder` הוא הצבע היחיד שקיים לטאבי טרמינל (נבדק בחבילה של 1.128), ולכן הרקע חייב להגיע מ-`list.*Selection*` הגלובליים; המפתח הקריטי הוא `inactiveSelectionBackground`, כי בזמן הקלדה בטרמינל הרשימה אינה בפוקוס. (2) `Notification` נורה גם על בקשת-הרשאה וגם על "מחכה לך 60 שניות", ולכן כל `✓` הפך ל-`‼` אחרי דקה (בלוג: 145 `done` מול 143 `attention`). `restore-title.sh` מוריד את מקרה ה-idle ל-`✓` לפי `notification_type=idle_prompt`, ובנפילה לפי טקסט ה-`message` (השדה חסר בבקשות הרשאה — claude-code#11964). כל התראה לא-מוכרת **נשארת** `‼` — הכיוון הבטוח. כל מטען נשמר ל-`notifications.log` לאימות |

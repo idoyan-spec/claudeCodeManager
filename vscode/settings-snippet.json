@@ -1,5 +1,5 @@
 {
-  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-09 22:31 v12 panel-top).",
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-10 00:31 v13 project-picker).",
   "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
 
   "//tabs": "Show a vertical tab list on the LEFT side of the terminal panel - it never shrinks like horizontal tabs.",

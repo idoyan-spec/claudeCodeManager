@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-09 22:31 v12 panel-top
+# BUILD: 2026-07-10 00:31 v13 project-picker
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)

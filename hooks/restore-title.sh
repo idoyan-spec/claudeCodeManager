@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-09 22:31 v12 panel-top
+# BUILD: 2026-07-10 00:31 v13 project-picker
 #
 # Title format:  "<model square> <status> <folder>"   e.g.  "🟨 ⟳ claudeCodeManager"
 #

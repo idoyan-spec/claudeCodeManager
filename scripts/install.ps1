@@ -9,12 +9,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 22:31 v12 panel-top
+  BUILD: 2026-07-10 00:31 v13 project-picker
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 22:31 v12 panel-top'
+$BUILD = '2026-07-10 00:31 v13 project-picker'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 

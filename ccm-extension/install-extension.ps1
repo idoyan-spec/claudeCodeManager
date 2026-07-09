@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 22:31 v12 panel-top
+# install-extension.ps1  |  BUILD: 2026-07-10 00:31 v13 project-picker
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #

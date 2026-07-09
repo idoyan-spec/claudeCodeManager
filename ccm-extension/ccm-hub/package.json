@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -13,7 +13,32 @@
       {
         "command": "ccmHub.newSession",
         "title": "ccm: New Claude session in a terminal"
+      },
+      {
+        "command": "ccmHub.openProjectPicker",
+        "title": "ccm: Open project (recent first)"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "ccmHub.openProjectPicker",
+        "key": "alt+o"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Code Manager Hub",
+      "properties": {
+        "ccmHub.projectsRoot": {
+          "type": "string",
+          "default": "E:\\MAIN_CLAUDE",
+          "markdownDescription": "Folder whose immediate subdirectories are listed by the `Alt+O` project picker."
+        },
+        "ccmHub.claudeCommand": {
+          "type": "string",
+          "default": "claude --dangerously-skip-permissions",
+          "markdownDescription": "Command run in the new terminal after it is opened in the chosen folder."
+        }
+      }
+    }
   }
 }
