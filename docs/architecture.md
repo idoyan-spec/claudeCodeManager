@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-09 21:10 v10 tab-bell`
+**Build:** `2026-07-09 22:31 v12 panel-top`
 
 ## Three problems, three fixes
 
@@ -147,7 +147,7 @@ the prompt line" is self-contradictory past the first press. Three situations:
 |----------|-----|--------------|
 | clicking a tab | single click | `terminal.integrated.tabs.focusMode: singleClick` |
 | in the tab list | `↑` / `↓` | move, enter that terminal, leave the list |
-| in a terminal | `Ctrl+↑` / `Ctrl+↓` | switch session, never leave the prompt line |
+| in a terminal | `Ctrl+↑`/`Ctrl+↓` **or** `Alt+↑`/`Alt+↓` | switch session, never leave the prompt line |
 
 Only the mouse case is a setting. Verified in the 1.128 bundle: `focusMode` is
 read by exactly two handlers — `onMouseClick` (acts on `singleClick`) and
@@ -165,10 +165,21 @@ nothing else.
 `Ctrl+↑`/`Ctrl+↓` override VS Code's default `scrollToPreviousCommand` /
 `scrollToNextCommand` (same keys, `when: terminalFocus`). Those navigate between
 past command outputs via shell integration, which is inert inside Claude Code's
-fullscreen TUI, so the trade costs nothing. `Alt+↑/↓` were free and would have
-avoided the override; `Ctrl` was chosen because it is easier to reach.
-`Ctrl+PageUp`/`Ctrl+PageDown` still work — they are the stock bindings for the
-same two commands.
+fullscreen TUI, so the trade costs nothing. `Alt+↑/↓` were free in the terminal.
+
+Since `v11` **both** modifiers are bound to the same two commands. Shipping only
+`Ctrl` was a mistake: the design conversation had mentioned `Alt` as the fallback,
+so that is the key the user reached for, found dead, and reported as a broken
+feature. Two keys onto one command costs two lines and removes the guess.
+`Ctrl+PageUp`/`Ctrl+PageDown` also still work — stock bindings, same two commands
+(default `primary: 2060` = `2048` CtrlCmd | `12` PageDown).
+
+**A keypress in a terminal only reaches VS Code if the command it resolves to is
+listed in the default `terminal.integrated.commandsToSkipShell`** — otherwise the
+bytes go to the shell. Verified against the 1.128 bundle: that list holds 159
+entries and includes `focusNext` and `focusPrevious`, which is why the modifier
+arrows work at all. It also includes `runCommands`, but the two `runCommands`
+bindings are gated on `terminalTabsFocus`, where no shell is listening anyway.
 
 Settings and keybindings are both watched live: a focus change needs no reload.
 
@@ -215,6 +226,58 @@ Hence: the bar is bright red (`#ff1a1a`) because it is what always survives; the
 blue fill is a bonus that is present most of the time. Widening the bar needs CSS
 injection via a third-party loader that patches the workbench and trips VS Code's
 "installation corrupt" warning — rejected, it violates the light+safe constraint.
+
+## Putting the terminal panel on top
+
+`workbench.action.positionPanelTop` exists and works, but the position it sets is
+persisted **per workspace**, as the numeric `workbench.panel.position` in that
+workspace's `state.vscdb` (`0=left 1=right 2=bottom 3=top`, per the bundle's
+`positionToString`).
+
+`ccm-hub` used to run the command once and record that in **`globalState`** — a
+machine-wide flag guarding a per-workspace effect. The first folder opened after
+install got its panel moved; the flag flipped; every other folder kept its bottom
+panel forever, and nothing indicated why. Measured before the fix: 4 of 5 recent
+workspaces still held `workbench.panel.position = 2`.
+
+Two changes, covering the two populations:
+
+- **Workspaces with no stored position** — `workbench.panel.defaultLocation: "top"`
+  in settings.json. No code involved.
+- **Workspaces that already have one** — the extension still runs the command, but
+  the guard now lives in **`workspaceState`**, so each workspace converts exactly
+  once and a user who drags the panel back is never overruled.
+
+The extension activates on `onStartupFinished` (as well as `onUri`), which is what
+makes "applies on reload" true at all.
+
+## Making the install portable
+
+Everything above is worthless on a second machine if the installer doesn't
+reproduce it. Until `v12` `install.ps1` copied the hook scripts to
+`~/.claude/skills/session-behavior/scripts/` and **never registered them**, so
+nothing ever called them; it *warned* about `CLAUDE_CODE_DISABLE_TERMINAL_TITLE`
+instead of setting it; and its one JSON write used `Set-Content -Encoding UTF8`,
+which emits a **BOM** in Windows PowerShell. A fresh machine would have shown bare
+tabs and one yellow line that didn't name the real problem.
+
+`install.ps1` now writes, idempotently and after a backup: `env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE`,
+`preferredNotifChannel`, and all six hook entries (five title hooks + the alert
+sound). Each is matched on a signature substring, so re-running adds nothing and a
+hook the user re-pointed elsewhere is left alone. All JSON goes through
+`Write-JsonObject` / `Write-JsonFile`, which use `UTF8Encoding($false)`.
+
+The alert-sound hook resolves the Windows directory with
+`[Environment]::GetFolderPath('Windows')` rather than a literal `C:\Windows`, and
+contains **no `$`**: hook commands are handed to a shell that expands `$` — that is
+precisely how `$HOME` in the title hooks resolves — so `$env:SystemRoot` would be
+eaten before `powershell` ever saw it.
+
+Verified by running the installer three times against a sandboxed fake machine
+(`USERPROFILE`/`APPDATA` redirected to a temp tree): run 1 registers everything,
+runs 2 and 3 report "already registered" and write nothing; the user's real
+`settings.json` stayed byte-identical throughout, and the emitted sound command
+executes through `bash -c` with exit 0.
 
 ## Why Claude Code's own title is disabled
 

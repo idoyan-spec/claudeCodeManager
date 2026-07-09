@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-09 21:10 v10 tab-bell
+// ccm-hub  |  BUILD: 2026-07-09 22:31 v12 panel-top
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI. No SendKeys, no focus games — the Terminal API.
 //
@@ -47,13 +47,26 @@ function openSession(folder) {
   term.sendText(`${osc}; claude --dangerously-skip-permissions`);
 }
 
+// VS Code stores the panel position PER WORKSPACE, as the numeric
+// `workbench.panel.position` in that workspace's state.vscdb
+// (0=left, 1=right, 2=bottom, 3=top — from the bundle's positionToString).
+//
+// So the guard must be per workspace too. It used to live in `globalState`:
+// the very first folder opened after install got its panel moved, the flag
+// flipped machine-wide, and every other folder kept its bottom panel forever.
+// Measured: 4 of 5 recent workspaces still had `workbench.panel.position = 2`.
+//
+// `workbench.panel.defaultLocation: "top"` in settings.json covers workspaces
+// that have no stored position yet; this converts the ones that do.
+const PANEL_TOP_KEY = 'ccmHub.panelTopApplied';
+
 function activate(context) {
-  // One-time: move the panel to the top (task #3). Respect later user changes
-  // by guarding on globalState so we never fight the user's own choice.
-  if (!context.globalState.get('ccmHub.panelTopApplied')) {
+  // Once per workspace: move the panel to the top. If the user later drags it
+  // back, the flag is already set for this workspace and we never fight them.
+  if (!context.workspaceState.get(PANEL_TOP_KEY)) {
     Promise.resolve(vscode.commands.executeCommand('workbench.action.positionPanelTop'))
       .then(
-        () => context.globalState.update('ccmHub.panelTopApplied', true),
+        () => context.workspaceState.update(PANEL_TOP_KEY, true),
         () => { /* command missing on this VS Code version — ignore */ }
       );
   }

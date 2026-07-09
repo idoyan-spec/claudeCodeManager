@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-09 21:10 v10 tab-bell`
+**Build:** `2026-07-09 22:31 v12 panel-top`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -84,12 +84,15 @@ claudeCodeManager/
 │   ├── architecture.md       how it works + resource/security notes
 │   └── vscode-setup.md       VS Code settings explained
 ├── vscode/
-│   └── settings-snippet.json terminal settings to merge
+│   ├── settings-snippet.json terminal settings to merge
+│   └── keybindings-snippet.json  terminal focus keys
 ├── scripts/
 │   ├── ccm.ps1               the launcher
 │   └── install.ps1           idempotent installer
-└── hooks/                    reference copies of the live ~/.claude hooks
+└── hooks/                    SOURCE of the hooks; install.ps1 deploys them
 ```
 
-> The **live** hooks run from `~/.claude/skills/session-behavior/scripts/`.
-> `hooks/` here is a documented snapshot, not the running copy.
+> `hooks/` is the **source of truth**. `install.ps1` copies it to
+> `~/.claude/skills/session-behavior/scripts/` *and registers the hook entries in*
+> `~/.claude/settings.json`, so a fresh machine needs no hand-editing. Edit the
+> deployed copy only and the repo starts lying.

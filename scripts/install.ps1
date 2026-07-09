@@ -9,14 +9,27 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-09 21:10 v10 tab-bell
+  BUILD: 2026-07-09 22:31 v12 panel-top
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-09 21:10 v10 tab-bell'
+$BUILD = '2026-07-09 22:31 v12 panel-top'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
+
+# `Set-Content -Encoding UTF8` writes a BOM in Windows PowerShell, and a BOM in a
+# JSON config is a coin-flip for whoever parses it. Always write JSON through these.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-JsonFile([string]$Path, $Value) {      # top-level ARRAY (keybindings)
+    $json = ConvertTo-Json -InputObject @($Value) -Depth 10
+    [System.IO.File]::WriteAllText($Path, $json, $utf8NoBom)
+}
+function Write-JsonObject([string]$Path, $Value) {    # top-level OBJECT (settings)
+    $json = ConvertTo-Json -InputObject $Value -Depth 20
+    [System.IO.File]::WriteAllText($Path, $json, $utf8NoBom)
+}
 
 Write-Host ""
 Write-Host "Claude Code Manager installer  ($BUILD)" -ForegroundColor Cyan
@@ -55,6 +68,10 @@ $want = [ordered]@{
     'terminal.integrated.enablePersistentSessions' = $true
     'terminal.integrated.enableVisualBell'         = $true
     'terminal.integrated.bellDuration'             = 3000
+    # Only honoured by a workspace that has no stored panel position. VS Code keeps
+    # `workbench.panel.position` per workspace, so already-opened folders keep their
+    # bottom panel until the ccm-hub extension converts them (once each).
+    'workbench.panel.defaultLocation'              = 'top'
 }
 
 # Merged separately: colorCustomizations is a nested object owned by the user,
@@ -123,34 +140,91 @@ if (Test-Path $repoHooks) {
     Write-Host "[3/4] hooks -> $hooksDir" -ForegroundColor Green
 }
 
+# Copying the scripts is not enough: nothing calls them until they are REGISTERED
+# as hooks in ~/.claude/settings.json. Until v12 the installer shipped the files,
+# warned about the env var, and registered nothing - so on a machine that had never
+# been hand-configured, the tabs stayed bare and nothing said why. Everything below
+# is matched on a signature substring, so re-running never appends a duplicate and a
+# hook the user re-pointed elsewhere is left alone.
+$hookCmd = 'bash "$HOME/.claude/skills/session-behavior/scripts/{0}"'   # $HOME stays literal: bash expands it
+$wantHooks = @(
+    @{ Event = 'SessionStart';     Cmd = ($hookCmd -f 'set-title.sh');                 Sig = 'set-title.sh' }
+    @{ Event = 'UserPromptSubmit'; Cmd = ($hookCmd -f 'update-title.sh');              Sig = 'update-title.sh' }
+    @{ Event = 'Stop';             Cmd = ($hookCmd -f 'restore-title.sh') + ' done';      Sig = 'restore-title.sh" done' }
+    @{ Event = 'PostToolUse';      Cmd = ($hookCmd -f 'restore-title.sh') + ' working';   Sig = 'restore-title.sh" working' }
+    @{ Event = 'Notification';     Cmd = ($hookCmd -f 'restore-title.sh') + ' attention'; Sig = 'restore-title.sh" attention' }
+    # Audible alert alongside the red tab flash. The Windows directory is resolved by
+    # .NET, not hardcoded to C:\Windows - and deliberately WITHOUT a `$` anywhere:
+    # hook commands are handed to a shell that expands `$` (that is how `$HOME` above
+    # works), so `$env:SystemRoot` would be eaten before powershell ever saw it.
+    @{ Event = 'Notification'
+       Cmd   = 'powershell -Command "(New-Object Media.SoundPlayer ([Environment]::GetFolderPath(''Windows'') + ''\Media\Alarm04.wav'')).PlaySync()"'
+       Sig   = 'Media.SoundPlayer' }
+)
+
 if (Test-Path $claudeSettings) {
     $cs = Get-Content -LiteralPath $claudeSettings -Raw
-    if ($cs -match 'CLAUDE_CODE_DISABLE_TERMINAL_TITLE') {
-        Write-Host "[3/4] CLAUDE_CODE_DISABLE_TERMINAL_TITLE is set - OK" -ForegroundColor Green
-    } else {
-        Write-Host "[3/4] WARNING: CLAUDE_CODE_DISABLE_TERMINAL_TITLE not found in ~/.claude/settings.json" -ForegroundColor Yellow
-        $ok = $false
-    }
+    $cj = $null
+    try { $cj = $cs | ConvertFrom-Json -ErrorAction Stop } catch { $cj = $null }
 
-    # The tab flash needs a BEL byte on the pty. A hook cannot write one - it has
-    # no controlling terminal. Claude Code can, because its stdout IS the pty.
-    # Read at startup only, so it lands on the NEXT session.
-    if ($cs -match '"preferredNotifChannel"\s*:\s*"terminal_bell"') {
-        Write-Host "[3/4] preferredNotifChannel = terminal_bell - OK" -ForegroundColor Green
+    if ($null -eq $cj) {
+        Write-Host "[3/4] WARNING: could not parse ~/.claude/settings.json - left untouched." -ForegroundColor Yellow
+        $ok = $false
     } else {
-        try {
-            $cj = $cs | ConvertFrom-Json -ErrorAction Stop
-            Copy-Item -LiteralPath $claudeSettings -Destination "$claudeSettings.ccm-backup-$((Get-Date).ToString('yyyyMMdd-HHmmss'))" -Force
+        Copy-Item -LiteralPath $claudeSettings `
+                  -Destination "$claudeSettings.ccm-backup-$((Get-Date).ToString('yyyyMMdd-HHmmss'))" -Force
+        $changed = @()
+
+        # Claude Code writes its own OSC title and would overwrite ours. Read at startup.
+        $envObj = $cj.env
+        if ($null -eq $envObj) { $envObj = [pscustomobject]@{} }
+        if (-not $envObj.CLAUDE_CODE_DISABLE_TERMINAL_TITLE) {
+            $envObj | Add-Member -NotePropertyName 'CLAUDE_CODE_DISABLE_TERMINAL_TITLE' -NotePropertyValue '1' -Force
+            $changed += 'env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE'
+        }
+        $cj | Add-Member -NotePropertyName 'env' -NotePropertyValue $envObj -Force
+
+        # The tab flash needs a BEL byte on the pty. A hook cannot write one - it has
+        # no controlling terminal. Claude Code can, because its stdout IS the pty.
+        if ($cj.preferredNotifChannel -ne 'terminal_bell') {
             $cj | Add-Member -NotePropertyName 'preferredNotifChannel' -NotePropertyValue 'terminal_bell' -Force
-            ($cj | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $claudeSettings -Encoding UTF8
-            Write-Host "[3/4] Set preferredNotifChannel = terminal_bell (takes effect in a NEW session)." -ForegroundColor Green
-        } catch {
-            Write-Host "[3/4] WARNING: could not set preferredNotifChannel in ~/.claude/settings.json" -ForegroundColor Yellow
-            $ok = $false
+            $changed += 'preferredNotifChannel'
+        }
+
+        $hooksObj = $cj.hooks
+        if ($null -eq $hooksObj) { $hooksObj = [pscustomobject]@{} }
+        foreach ($w in $wantHooks) {
+            $groups = @()
+            foreach ($g in @($hooksObj.($w.Event))) { if ($null -ne $g) { $groups += $g } }
+
+            $found = $false
+            foreach ($g in $groups) {
+                foreach ($h in @($g.hooks)) {
+                    if ($null -ne $h -and $h.command -like "*$($w.Sig)*") { $found = $true }
+                }
+            }
+            if (-not $found) {
+                $groups += [pscustomobject]@{
+                    matcher = '*'
+                    hooks   = @([pscustomobject]@{ type = 'command'; command = $w.Cmd; timeout = 5 })
+                }
+                $hooksObj | Add-Member -NotePropertyName $w.Event -NotePropertyValue $groups -Force
+                $changed += "hooks.$($w.Event)"
+            }
+        }
+        $cj | Add-Member -NotePropertyName 'hooks' -NotePropertyValue $hooksObj -Force
+
+        if ($changed.Count -gt 0) {
+            Write-JsonObject $claudeSettings $cj
+            $shown = @($changed | Select-Object -Unique)   # Notification carries two hooks
+            Write-Host "[3/4] ~/.claude/settings.json updated: $($shown -join ', ')" -ForegroundColor Green
+            Write-Host "      (takes effect in a NEW Claude session)"
+        } else {
+            Write-Host "[3/4] env + hooks + preferredNotifChannel already registered - OK" -ForegroundColor Green
         }
     }
 } else {
-    Write-Host "[3/4] WARNING: ~/.claude/settings.json not found" -ForegroundColor Yellow
+    Write-Host "[3/4] WARNING: ~/.claude/settings.json not found - start Claude Code once, then re-run." -ForegroundColor Yellow
     $ok = $false
 }
 foreach ($f in 'set-title.sh','update-title.sh','restore-title.sh','_apply-title.sh','_model-glyph.sh','set-tab-title.ps1') {
@@ -174,16 +248,17 @@ foreach ($f in 'set-title.sh','update-title.sh','restore-title.sh','_apply-title
 #     file with a no-BOM UTF8 encoder instead.
 $kbPath    = Join-Path $env:APPDATA 'Code\User\keybindings.json'
 $kbSnippet = Join-Path $root 'vscode\keybindings-snippet.json'
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-function Write-JsonFile([string]$Path, $Value) {
-    $json = ConvertTo-Json -InputObject @($Value) -Depth 10
-    [System.IO.File]::WriteAllText($Path, $json, $utf8NoBom)
-}
-
+# Ctrl and Alt are both bound to the terminal-switch commands: the user reached for
+# Alt, found nothing, and reported the feature dead. Two keys, one command, no ambiguity.
+# Both survive the terminal because focusNext/focusPrevious ship in the default
+# `terminal.integrated.commandsToSkipShell`; a command outside that list would be
+# swallowed by the shell instead of reaching VS Code.
 $wantKb = @(
     [pscustomobject]@{ key = 'ctrl+down'; command = 'workbench.action.terminal.focusNext';     when = 'terminalFocus && !terminalTabsFocus' }
     [pscustomobject]@{ key = 'ctrl+up';   command = 'workbench.action.terminal.focusPrevious'; when = 'terminalFocus && !terminalTabsFocus' }
+    [pscustomobject]@{ key = 'alt+down';  command = 'workbench.action.terminal.focusNext';     when = 'terminalFocus && !terminalTabsFocus' }
+    [pscustomobject]@{ key = 'alt+up';    command = 'workbench.action.terminal.focusPrevious'; when = 'terminalFocus && !terminalTabsFocus' }
     [pscustomobject]@{ key = 'down'; command = 'runCommands'; when = 'terminalTabsFocus'
                        args = [pscustomobject]@{ commands = @('list.focusDown','list.select','workbench.action.terminal.focus') } }
     [pscustomobject]@{ key = 'up';   command = 'runCommands'; when = 'terminalTabsFocus'
