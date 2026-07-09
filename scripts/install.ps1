@@ -4,16 +4,16 @@
   What it does (all idempotent - safe to run more than once):
     1. Registers the `ccm` command in your PowerShell profile.
     2. Merges the recommended VS Code terminal settings (makes a backup first).
-    3. Verifies the session-behavior hooks + CLAUDE_CODE_DISABLE_TERMINAL_TITLE.
+    3. Deploys the session-behavior hooks and verifies CLAUDE_CODE_DISABLE_TERMINAL_TITLE.
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-07 v1 vscode-hub
+  BUILD: 2026-07-09 v3 status-icons
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-07 v1 vscode-hub'
+$BUILD = '2026-07-09 v3 status-icons'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 
@@ -46,11 +46,16 @@ $settings = Join-Path $env:APPDATA 'Code\User\settings.json'
 $snippet  = Join-Path $root 'vscode\settings-snippet.json'
 $want = [ordered]@{
     'terminal.integrated.tabs.enabled'             = $true
-    'terminal.integrated.tabs.location'            = 'right'
+    'terminal.integrated.tabs.location'            = 'left'
     'terminal.integrated.tabs.hideCondition'       = 'never'
     'terminal.integrated.tabs.title'               = '${sequence}'
+    'terminal.integrated.tabs.showActiveTerminal'  = 'always'
     'terminal.integrated.enablePersistentSessions' = $true
 }
+
+# Merged separately: colorCustomizations is a nested object owned by the user,
+# so we add our one key without discarding theirs.
+$wantColors = @{ 'terminal.tab.activeBorder' = '#00b4ff' }
 
 if (-not (Test-Path $settings)) {
     New-Item -ItemType File -Path $settings -Force | Out-Null
@@ -72,15 +77,33 @@ if ($null -eq $obj) {
     foreach ($k in $want.Keys) {
         $obj | Add-Member -NotePropertyName $k -NotePropertyValue $want[$k] -Force
     }
+
+    $colors = $obj.'workbench.colorCustomizations'
+    if ($null -eq $colors) { $colors = [pscustomobject]@{} }
+    foreach ($k in $wantColors.Keys) {
+        $colors | Add-Member -NotePropertyName $k -NotePropertyValue $wantColors[$k] -Force
+    }
+    $obj | Add-Member -NotePropertyName 'workbench.colorCustomizations' -NotePropertyValue $colors -Force
+
     ($obj | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $settings -Encoding UTF8
     Write-Host "[2/3] Merged terminal settings into VS Code." -ForegroundColor Green
     Write-Host "      Backup saved: $backup"
 }
 
-# --- 3. Verify the hooks + env var -----------------------------------------
+# --- 3. Deploy + verify the hooks & env var --------------------------------
 $claudeSettings = Join-Path $env:USERPROFILE '.claude\settings.json'
 $hooksDir       = Join-Path $env:USERPROFILE '.claude\skills\session-behavior\scripts'
+$repoHooks      = Join-Path $root 'hooks'
 $ok = $true
+
+# The hooks are the source of the tab title. Ship them, don't just check them -
+# this is what makes the install portable to a second machine.
+if (Test-Path $repoHooks) {
+    New-Item -ItemType Directory -Force -Path $hooksDir | Out-Null
+    Copy-Item (Join-Path $repoHooks '*.sh')  $hooksDir -Force
+    Copy-Item (Join-Path $repoHooks '*.ps1') $hooksDir -Force
+    Write-Host "[3/3] hooks -> $hooksDir" -ForegroundColor Green
+}
 
 if (Test-Path $claudeSettings) {
     $cs = Get-Content -LiteralPath $claudeSettings -Raw
@@ -94,7 +117,7 @@ if (Test-Path $claudeSettings) {
     Write-Host "[3/3] WARNING: ~/.claude/settings.json not found" -ForegroundColor Yellow
     $ok = $false
 }
-foreach ($f in 'set-title.sh','update-title.sh','restore-title.sh','set-tab-title.ps1') {
+foreach ($f in 'set-title.sh','update-title.sh','restore-title.sh','_apply-title.sh','_model-glyph.sh','set-tab-title.ps1') {
     if (-not (Test-Path (Join-Path $hooksDir $f))) {
         Write-Host "      MISSING hook script: $f" -ForegroundColor Yellow
         $ok = $false

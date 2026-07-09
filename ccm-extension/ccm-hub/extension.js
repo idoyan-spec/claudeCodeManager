@@ -1,39 +1,41 @@
-// ccm-hub  |  BUILD: 2026-07-09 v1
+// ccm-hub  |  BUILD: 2026-07-09 v3 status-icons
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI. No SendKeys, no focus games — the Terminal API.
 //
-// URI:  vscode://ccm.hub/session?path=<percent-encoded folder>&model=<optional>
+// URI:  vscode://ccm.hub/session?path=<percent-encoded folder>
+//
+// Status and model live in the tab TITLE, not here. VS Code freezes a terminal's
+// icon and color at createTerminal() time — `Terminal` exposes no setter for
+// either, and the command `workbench.action.terminal.changeIcon` ignores any
+// argument (microsoft/vscode#239973 was rejected). So anything that has to track
+// a running session is written by the ccm hooks as an OSC title sequence, which
+// `terminal.integrated.tabs.title: "${sequence}"` renders. See docs/architecture.md.
 const vscode = require('vscode');
 const path = require('path');
 
-function modelColor(model) {
-  const m = (model || '').toLowerCase();
-  if (m.indexOf('fable') >= 0)  return new vscode.ThemeColor('terminal.ansiBlue');
-  if (m.indexOf('haiku') >= 0)  return new vscode.ThemeColor('terminal.ansiRed');
-  if (m.indexOf('sonnet') >= 0) return new vscode.ThemeColor('terminal.ansiGreen');
-  if (m.indexOf('opus') >= 0)   return new vscode.ThemeColor('terminal.ansiWhite');
-  return undefined;
-}
+// A static icon so a Claude session is distinguishable from a plain shell tab.
+const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
-function openSession(folder, model) {
+function openSession(folder) {
   if (!folder) {
     vscode.window.showErrorMessage('ccm-hub: no folder path was provided.');
     return;
   }
   const name = path.basename(folder.replace(/[\\/]+$/, '')) || folder;
-  const opts = { name: name, cwd: folder };
-  const color = modelColor(model);
-  if (color) opts.color = color;
 
-  const term = vscode.window.createTerminal(opts);
+  const term = vscode.window.createTerminal({
+    name: name,
+    cwd: folder,
+    iconPath: SESSION_ICON
+  });
   term.show();
   // Start Claude in auto mode. The session-behavior hooks then own the tab
-  // title (folder name + status glyph).
+  // title: "<model square> <status glyph> <folder>".
   term.sendText('claude --dangerously-skip-permissions');
 }
 
 function activate(context) {
-  // One-time: move the panel to the top (task #5). Respect later user changes
+  // One-time: move the panel to the top (task #3). Respect later user changes
   // by guarding on globalState so we never fight the user's own choice.
   if (!context.globalState.get('ccmHub.panelTopApplied')) {
     Promise.resolve(vscode.commands.executeCommand('workbench.action.positionPanelTop'))
@@ -48,9 +50,7 @@ function activate(context) {
       handleUri(uri) {
         // uri.query is the raw (encoded) query string; URLSearchParams decodes it.
         const params = new URLSearchParams(uri.query || '');
-        const folder = params.get('path') || '';
-        const model = params.get('model') || '';
-        openSession(folder, model);
+        openSession(params.get('path') || '');
       }
     })
   );
@@ -60,7 +60,7 @@ function activate(context) {
       const picked = await vscode.window.showInputBox({
         prompt: 'Folder path for the new Claude session'
       });
-      if (picked) openSession(picked, '');
+      if (picked) openSession(picked);
     })
   );
 }

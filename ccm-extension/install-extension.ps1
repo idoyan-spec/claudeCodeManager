@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-09 v1
+# install-extension.ps1  |  BUILD: 2026-07-09 v3 status-icons
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #
@@ -19,7 +19,15 @@ $extRoot  = Join-Path $env:USERPROFILE '.vscode\extensions'
 $dest     = Join-Path $extRoot $destName
 
 New-Item -ItemType Directory -Force -Path $extRoot | Out-Null
-if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+
+# Drop every earlier copy of this extension id. Two folders sharing one id
+# (ccm.hub-0.0.1 and ccm.hub-0.0.2) leave VS Code loading a stale extension.
+Get-ChildItem -Path $extRoot -Directory -Filter "$($pkg.publisher).$($pkg.name)-*" -ErrorAction SilentlyContinue |
+    ForEach-Object {
+        Write-Host "  removing old copy: $($_.Name)" -ForegroundColor DarkGray
+        Remove-Item $_.FullName -Recurse -Force
+    }
+
 Copy-Item $src $dest -Recurse -Force
 
 Write-Host "  installed -> $dest" -ForegroundColor Green
