@@ -12,11 +12,13 @@
 | קובץ | תפקיד |
 |-------|--------|
 | `scripts/ccm.ps1` | המשגר: פותח תיקייה כסשן בטאב הנוכחי, נותן לטאב את שם התיקייה ומריץ `claude` |
-| `scripts/install.ps1` | מתקין אידמפוטנטי: רושם את `ccm` ב-PROFILE, ממזג הגדרות VS Code (עם גיבוי), מאמת הוקים |
+| `scripts/install.ps1` | מתקין אידמפוטנטי: רושם את `ccm` ב-PROFILE, ממזג הגדרות VS Code (עם גיבוי), **מפיץ** את ההוקים ומאמת אותם |
 | `vscode/settings-snippet.json` | הגדרות הטרמינל של VS Code למיזוג |
 | `docs/architecture.md` | איך זה עובד + פרופיל משאבים/אבטחה |
 | `docs/vscode-setup.md` | הסבר כל הגדרה + אימות |
-| `hooks/` | עותקי-ייחוס של ההוקים החיים (snapshot, לא הריצה בפועל) |
+| `hooks/` | מקור-האמת של ההוקים; `install.ps1` מעתיק אותם ל-`~/.claude/skills/session-behavior/scripts` |
+| `hooks/_model-glyph.sh` | מזהה את המודל מה-transcript (סינון sidechain) ובונה את הכותרת `<ריבוע-מודל> <סטטוס> <תיקייה>` |
+| `.gitattributes` | מכריח LF ב-`*.sh` (autocrlf היה מוציא CRLF ב-clone, ו-bash דוחה shebang שנגמר ב-`\r`) |
 | `USER_GUIDE.md` / `USER_GUIDE.html` | חוברת הסבר למשתמש (עברית) |
 | `ccm-extension/ccm-hub/` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` שפותח טרמינל חדש בחלון הקיים ומריץ Claude |
 | `ccm-extension/install-extension.ps1` | side-load של התוסף ל-`~/.vscode/extensions` (ללא npm/admin) |
