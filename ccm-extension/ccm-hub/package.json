@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -17,14 +17,36 @@
       {
         "command": "ccmHub.openProjectPicker",
         "title": "ccm: Open project (recent first)"
+      },
+      {
+        "command": "ccmHub.closeSession",
+        "title": "ccm: Close terminal (backup / close / keep)"
       }
     ],
     "keybindings": [
       {
         "command": "ccmHub.openProjectPicker",
         "key": "alt+o"
+      },
+      {
+        "command": "ccmHub.closeSession",
+        "key": "alt+q"
       }
     ],
+    "menus": {
+      "terminal/title/context": [
+        {
+          "command": "ccmHub.closeSession",
+          "group": "navigation@1"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "ccmHub.closeSession",
+          "group": "navigation@1"
+        }
+      ]
+    },
     "configuration": {
       "title": "Claude Code Manager Hub",
       "properties": {
@@ -37,6 +59,11 @@
           "type": "string",
           "default": "claude --dangerously-skip-permissions",
           "markdownDescription": "Command run in the new terminal after it is opened in the chosen folder."
+        },
+        "ccmHub.guardTerminalClose": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (only if you have not set it yourself), and offers to restore a Claude session you killed. `Alt+Q` asks *backup / close / keep* regardless of this setting."
         }
       }
     }

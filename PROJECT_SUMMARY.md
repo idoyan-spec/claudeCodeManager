@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-10 00:31 v13 project-picker`
+**גרסה / Build:** `2026-07-10 09:04 v14 close-guard`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -21,7 +21,8 @@
 | `hooks/_model-glyph.sh` | מזהה את המודל מה-transcript (סינון sidechain) ובונה את הכותרת `<ריבוע-מודל> <סטטוס> <תיקייה>` |
 | `.gitattributes` | מכריח LF ב-`*.sh` (autocrlf היה מוציא CRLF ב-clone, ו-bash דוחה shebang שנגמר ב-`\r`) |
 | `USER_GUIDE.md` / `USER_GUIDE.html` | חוברת הסבר למשתמש (עברית) |
-| `ccm-extension/ccm-hub/extension.js` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` + **בורר הפרויקטים ב-`Alt+O`**; פותח טרמינל חדש בחלון הקיים ומריץ Claude |
+| `ccm-extension/ccm-hub/extension.js` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` + **בורר הפרויקטים ב-`Alt+O`** + **שומר הסגירה ב-`Alt+Q`**; פותח טרמינל חדש בחלון הקיים ומריץ Claude |
+| `ccm-extension/test-extension.js` | 46 בדיקות מול `vscode` מזויף (`Module._resolveFilename`); שומר על שני האינווריאנטים: אין `name` ל-`createTerminal`, ואין סגירת טרמינל על ספק |
 | `ccm-extension/ccm-hub/projects.js` | דירוג "לפי מה שנכנסתי אליו לאחרונה" — Node טהור, ללא `vscode`, ולכן ניתן לבדיקה מחוץ ל-VS Code |
 | `ccm-extension/install-extension.ps1` | side-load של התוסף ל-`~/.vscode/extensions` (ללא npm/admin) |
 | `explorer-context-menu/launchers/*.vbs` | מפעילי wscript (ללא חלון קונסולה): `claude-hub.vbs` (יורה את ה-URI), `claude-terminal.vbs` (Windows Terminal+Claude) |
@@ -76,6 +77,32 @@
     ההגדרות של המתקין — כי המתקין דורס מפתח **בשלמותו** והיה מוחק מזהים שהמשתמש הוסיף.
 14. **`Alt+O` פנוי:** 0 קישורים בחבילת 1.128 (לעומת `Alt+P` שיש לו 3), 0 בקובץ הקיצורים של
     המשתמש, ולא מנמוניקה של תפריט. הקיצור נשלח עם התוסף (`contributes.keybindings`) ולכן נייד.
+    `Alt+Q` (`primary:559`) נבחר באותה שיטה. `Alt+W` (`565`) נראה פנוי ואינו — הוא
+    `toggleFindWholeWord` תחת `when: findVisible`, שנכון בדיוק כשטרמינל בפוקוס.
+15. **אין `onWillCloseTerminal`:** ל-API של תוספים יש `onDidCloseTerminal` **בלבד** (0 תוצאות
+    ל-`onWillCloseTerminal` ב-extension host של 1.128). לכן תוסף **לא יכול** להציב דיאלוג
+    משלו לפני כפתור הפח. כל התכנון של שומר-הסגירה נגזר מהעובדה הזאת.
+16. **מה כן קיים — `confirmOnKill`:** כל מסלולי ההריגה המובנים (פח, קליק-אמצעי, `Kill Terminal`,
+    `Kill All`) עוברים דרך `safeDisposeTerminal`, שמותנה בו. ברירת המחדל `"editor"` מאשרת רק
+    טרמינלים באזור העורך — כלומר **לא** את שלנו, שכולם ב-panel. התוסף קובע `"always"`, ורק אם
+    ל-`inspect().globalValue` אין ערך, כדי לא לדרוס `"never"` מכוון של המשתמש. עוד תנאי שם:
+    `hasChildProcesses` — טרמינל בטל בשורת פרומפט נסגר בשקט גם ב-`"always"`.
+17. **`Alt+Q` — הסגירה שכן שלנו:** `showWarningMessage({modal:true})` עם *גבה וסגור / סגור /
+    השאר פתוח*, כש-"השאר" נושא `isCloseAffordance: true` כך ש-`Esc` וה-`X` נפתרים אליו.
+    הדיאלוג **נוקב בשם התיקייה** שהוא עומד לסגור: שתי כניסות התפריט פועלות על
+    `activeTerminal`, ועמימות שהמשתמש רואה ועונה עליה "השאר" עדיפה על סשן שנהרג בשקט.
+18. **המתנה לגיבוי דרך כותרת הטאב:** VS Code מעביר את הכותרת המפוענחת ל-extension host
+    (`onAnyInstanceTitleChange → $acceptTerminalTitleChange`), כך ש-`Terminal.name` הוא קריאה
+    חיה של הגליף שההוקים כתבו. הסדר הוא כל הטריק: **קודם מחכים ל-`⟳`** — ברגע השליחה הטאב עוד
+    נושא `✓` **ישן**, והמתנה ל-`✓` הייתה סוגרת מיידית בלי לגבות כלום; רק אחר כך מחכים ש-`✓`
+    יעמוד ב-3 דגימות רצופות, כי `Stop` יכול לירות בין שתי קריאות כלי.
+19. **האינווריאנט:** `backupThenClose` סוגר את הטרמינל בתוצאה **אחת בדיוק** — `done`. timeout,
+    ביטול, `‼`, טרמינל שמת מעצמו — כולם משאירים אותו פתוח ומסבירים למה. פיצ'ר שנועד למנוע
+    אובדן טרמינל חייב להיכשל לכיוון של טרמינל שנשאר פתוח. חמש הסיומות נבדקות בנפרד.
+20. **ה-undo:** `exitStatus.reason` (`Unknown 0, Shutdown 1, Process 2, User 3, Extension 4`).
+    רק `User` מציע שחזור. `Process` = claude יצא לבד, `Shutdown` = VS Code נסגר (מודאל שם היה
+    בלתי נסבל), `Extension` = ה-`dispose()` שלנו, שכבר נענה. השחזור פותח `claude --continue`,
+    שמחזיר את השיחה מה-`.jsonl` — התהליך נהרג, השיחה לא.
 
 ## איך להשתמש
 ### התקנה / הכנה
@@ -89,8 +116,18 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 2. **`Alt+O`** → בורר צף עם כל הפרויקטים, האחרון שעבדת בו ראשון. Enter פותח והחלון נסגר.
    פרויקט שכבר רץ מסומן `● running` ומקבל פוקוס במקום סשן שני.
 3. לחלופין, בטרמינל: `ccm E:\path\to\project` (טאב חדש: `Ctrl+Shift+5`).
+4. **`Alt+Q`** (או קליק ימני על הטאב) → *גבה וסגור / סגור / השאר פתוח*. הפח של VS Code מבקש
+   אישור בפני עצמו, וסשן שנהרג בכל זאת מוצע לשחזור עם `claude --continue`.
 
-הגדרות: `ccmHub.projectsRoot` (ברירת מחדל `E:\MAIN_CLAUDE`), `ccmHub.claudeCommand`.
+הגדרות: `ccmHub.projectsRoot` (ברירת מחדל `E:\MAIN_CLAUDE`), `ccmHub.claudeCommand`,
+`ccmHub.guardTerminalClose` (ברירת מחדל `true`).
+
+### בדיקות
+```
+node ccm-extension/test-extension.js
+```
+46 בדיקות מול `vscode` מזויף, ללא VS Code. `ext.timing` הוא תפר-בדיקה שמכווץ את סקר-הגיבוי
+מדקות למילישניות.
 
 ### פריסה (Deploy)
 לא רלוונטי - כלי מקומי. הפצה = repo פרטי ב-GitHub (`idoyan-spec`).
@@ -98,6 +135,7 @@ E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ## היסטוריית שינויים
 | תאריך | שינוי |
 |--------|-------|
+| 2026-07-10 | **שומר סגירת טרמינל (`v14 close-guard`):** טרמינל כאן הוא שיחה חיה, וקליק אחד על הפח סיים אותה. (1) **אין `onWillCloseTerminal`** — ל-API יש `onDidCloseTerminal` בלבד (0 תוצאות ב-extension host של 1.128), ולכן תוסף **לא יכול** להציב דיאלוג לפני הפח. כל השאר נגזר מזה. (2) **`confirmOnKill`** הוא מה שכן קיים: כל ההריגות המובנות עוברות ב-`safeDisposeTerminal`, וברירת המחדל `"editor"` מדלגת על טרמינלי panel — כלומר על **כולנו**. התוסף קובע `"always"` רק כשאין ל-`globalValue` ערך, כדי לא לדרוס `"never"` מכוון. (3) **`Alt+Q`** הוא הסגירה שכן שלנו: מודאל *גבה וסגור / סגור / השאר פתוח*, כש-"השאר" הוא `isCloseAffordance` ולכן `Esc` נופל אליו, והדיאלוג **נוקב בשם התיקייה** כי שתי כניסות התפריט פועלות על `activeTerminal`. (4) **ההמתנה לגיבוי קוראת את כותרת הטאב**: VS Code מזרים אותה ל-`Terminal.name`, וההוקים כבר כותבים שם `⟳`/`✓`/`‼`. מחכים **קודם ל-`⟳`** — בשליחה הטאב עוד נושא `✓` ישן, והמתנה ל-`✓` הייתה סוגרת מיידית בלי לגבות כלום — ואז ל-`✓` יציב ב-3 דגימות, כי `Stop` יורה בין קריאות כלי. (5) **האינווריאנט**: סוגרים בתוצאה אחת בדיוק, `done`; timeout/ביטול/`‼`/מוות עצמאי משאירים פתוח ומסבירים. (6) **undo**: `exitStatus.reason === User` בלבד מציע שחזור עם `claude --continue` (לא `Shutdown`, לא `Process`, ולא ה-`dispose()` שלנו). `Alt+Q` = `primary:559`, 0 התנגשויות; `Alt+W` נראה פנוי ואינו. אומת: 46 בדיקות עוברות, ומופע VS Code מבודד לגמרי כתב `confirmOnKill: always` + שתי הפקודות ל-`commandsToSkipShell` ללא שגיאות ובלי לגעת ב-`settings.json` האמיתי |
 | 2026-07-10 | **בורר פרויקטים צף ב-`Alt+O` (`v13 project-picker`):** QuickPick עם כל התיקיות תחת `E:\MAIN_CLAUDE`, ממוין לפי מתי נכנסת אליהן לאחרונה; Enter פותח טרמינל עם Claude והחלון נסגר. (1) **המיון** הוא `max(MRU של התוסף, mtime של ההיסטוריה של Claude)` — ה-MRU לבדו ריק בהתקנה טרייה ועיוור ל-`ccm.ps1`/תפריט Explorer, וה-mtime לבדו לא יודע מה פתחת דרך הבורר. (2) **קידוד ה-cwd של Claude** (`[^a-zA-Z0-9]` → `-`) **מאבד מידע** — `הקלטה לקלוד` הופך לרצף מקפים ואי אפשר לפענח חזרה; לכן הוא משמש **רק קדימה**, מתיקייה אמיתית בדיסק. אומת: 15/30 התאמות מדויקות, 0 התנגשויות, ו-`\` מול `/` מקודדים זהה. (3) **mtime של תיקייה משקר**: ב-NTFS הוא זז ביצירת קובץ אך **לא** בהוספה לקובץ קיים, וסשן ארוך הוא הוספה אחת ל-`.jsonl` — נמדד שתיקייה עם סשן **חי באותו רגע** דיווחה `8h ago`. הפתרון: ה-mtime המקסימלי של התיקייה **ושל התמלילים**. (4) **הקיצור היה נבלע**: הקשה בטרמינל בפוקוס עוברת ל-shell אלא אם מזהה הפקודה ב-`commandsToSkipShell`, ופקודה מותאמת לעולם אינה ברשימת 159 ברירות-המחדל. אומת ב-1.128 שהמערך של המשתמש **ממוזג** לתוך ברירות המחדל (`new Set(defaults)` ואז `t.add`), ולכן התוסף מוסיף את עצמו אידמפוטנטית ב-`activate()` — **לא** דרך מיזוג ההגדרות של המתקין, שדורס מפתח בשלמותו. (5) `Alt+O` נבחר כי יש לו 0 קישורים בחבילה (ל-`Alt+P` יש 3). (6) פרויקט שכבר רץ מקבל פוקוס במקום סשן כפול. נבדק ב-hard harness עם `vscode` מזויף: 20 בדיקות עוברות, כולל שהבורר עדיין **לא** מעביר `name` ל-`createTerminal` |
 | 2026-07-09 | **`Alt` + פאנל עליון + התקנה ניידת באמת (`v11 alt-arrows`, `v12 panel-top`):** (1) `Alt+↑/↓` לא הגיבו כי **מעולם לא חוברו** — רק `Ctrl` היה. שניהם עכשיו מצביעים לאותה פקודה. אומת בחבילת 1.128 ש-`focusNext`/`focusPrevious` נמצאים ב-`commandsToSkipShell` (159 ערכים) — בלי זה הצירוף היה נבלע ע"י ה-shell ולא מגיע ל-VS Code כלל. (2) **הפאנל העליון**: `workbench.panel.position` נשמר **לכל workspace בנפרד** (`0=left 1=right 2=bottom 3=top`), אבל הדגל של התוסף ישב ב-`globalState` — ולכן רק התיקייה הראשונה אחרי ההתקנה זזה, וכל השאר נשארו למטה לנצח (נמדד: 4 מתוך 5 עם `=2`). עכשיו `workspaceState` בתוסף (0.0.4) + `workbench.panel.defaultLocation: "top"` להגדרות. (3) **המתקין לא היה נייד**: הוא העתיק את קבצי ההוקים ו**לא רשם אותם** ב-`settings.json` — כלומר אף אחד לא קרא להם; הוא רק **התלונן** על `CLAUDE_CODE_DISABLE_TERMINAL_TITLE` במקום לכתוב אותו; והכתיבה היחידה שלו (`Set-Content -Encoding UTF8`) הוסיפה **BOM**. שלושתם תוקנו. הוק הצליל מוצא את תיקיית Windows דרך `[Environment]::GetFolderPath('Windows')` ו**בלי `$`** — ה-shell שמריץ הוקים מרחיב `$` (כך `$HOME` עובד), ולכן `$env:SystemRoot` היה נאכל. אומת על "מחשב מדומה" (USERPROFILE/APPDATA לתיקייה זמנית): הרצה 1 רושמת הכל, 2–3 לא נוגעות; ה-`settings.json` האמיתי נשאר זהה בית-בית |
 | 2026-07-09 | **הבהוב אדום על הטאב שצריך אותך (`v10 tab-bell`):** VS Code הופך תו BEL לאייקון סטטוס זמני על הטאב הספציפי (`enableVisualBell` + `bellDuration`, צבע מ-`list.warningForeground`). **הוק לא יכול לצלצל** — אין לו tty; `WriteConsoleW("\a")` דרך AttachConsole מצליח אבל conhost לא מעביר BEL ל-pty. **Claude כן יכול**, כי ה-stdout שלו הוא ה-pty: `preferredNotifChannel: "terminal_bell"` (נקרא בעליית סשן בלבד), יורה על `permission_prompt` ועל `idle_prompt`. בנוסף: `terminal.tab.activeBorder` → אדום זוהר, כי הוא הסימן **היחיד** הקשור לטרמינל הפעיל (`.is-active:before`, רוחב 1px קשיח ב-CSS); הרקע הכחול תלוי ב**בחירה ברשימה** ונעלם בלחיצה על השטח הריק. **תוקן באג במתקין:** `@($raw \| ConvertFrom-Json)` החזיר מערך כאובייקט **בודד**, ה-dedupe לא מצא `.key`, וכל ארבעת הקיצורים נוספו שוב — הקובץ נשמר כ-`{"value":[...],"Count":4}`. עכשיו יש unroll מפורש, סינון לפי `key`, וכתיבה ללא BOM. אומת: שתי הרצות רצופות → 4 קיצורים, 0 כפילויות |

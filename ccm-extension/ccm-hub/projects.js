@@ -1,4 +1,4 @@
-// ccm-hub / projects.js  |  BUILD: 2026-07-10 00:31 v13 project-picker
+// ccm-hub / projects.js  |  BUILD: 2026-07-10 09:04 v14 close-guard
 //
 // The recency model behind the project picker.
 //

@@ -1,4 +1,4 @@
-// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-10 00:31 v13 project-picker).
+// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-10 09:04 v14 close-guard).
 // Merge into your VS Code keybindings.json. install.ps1 does it for you (with a backup).
 //
 // Goal: the caret should land on the prompt line of the session you moved to,

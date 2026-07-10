@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-10 00:31 v13 project-picker`
+**Build:** `2026-07-10 09:04 v14 close-guard`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -29,6 +29,7 @@ Running one standalone terminal per project means:
 | Can't tell which model a session runs | A **coloured square** read from the transcript - follows `/model` live |
 | Can't tell which tab is focused | `terminal.tab.activeBorder` paints a bright border on it |
 | Typing a path to open a project | **`Alt+O`** — a floating picker of every project, most recently used first |
+| Closing a session by mistake | **`Alt+Q`** asks *backup / close / keep*, and the trash icon now confirms first |
 
 ## Quick start
 
@@ -63,6 +64,30 @@ first press and stays right no matter how a session was started:
   whenever it actually runs in that folder.
 
 Configure with `ccmHub.projectsRoot` and `ccmHub.claudeCommand` in VS Code settings.
+
+## `Alt+Q` — closing a session on purpose
+
+A terminal is a live Claude session, and one stray click on the trash icon used
+to end it. Two guards now stand in the way.
+
+**`Alt+Q`** (also on both terminal context menus) asks three questions, naming the
+folder it is about to close:
+
+- **גבה וסגור** — runs `/session-backup` in that session, waits for it to finish,
+  then closes the tab.
+- **סגור** — closes it now.
+- **השאר פתוח** — nothing. `Esc` means this too.
+
+It closes the terminal on exactly one outcome: the backup finished. A timeout, a
+cancellation, or Claude stopping to ask you something all leave the tab open.
+
+**The trash icon** can't be intercepted — VS Code has no cancellable
+"terminal is about to close" event for extensions. What it does have is
+`terminal.integrated.confirmOnKill`, which the extension sets to `always` (its
+default, `editor`, does not cover panel terminals — i.e. all of ours). And if a
+session is killed anyway, you are offered it back: `claude --continue` reopens the
+conversation from Claude's own transcript. Turn all of this off with
+`ccmHub.guardTerminalClose: false`.
 
 - **New to VS Code? Start here (Hebrew):** [VSCODE_GUIDE.html](VSCODE_GUIDE.html) — screen map, terminal, shortcuts
 - **Full walk-through (Hebrew, non-technical):** [USER_GUIDE.html](USER_GUIDE.html) / [USER_GUIDE.md](USER_GUIDE.md)

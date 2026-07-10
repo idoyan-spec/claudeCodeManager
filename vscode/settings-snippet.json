@@ -1,5 +1,5 @@
 {
-  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-10 00:31 v13 project-picker).",
+  "//": "Claude Code Manager - recommended VS Code terminal settings (BUILD 2026-07-10 09:04 v14 close-guard).",
   "//1": "Merge these keys into your VS Code user settings.json. install.ps1 can do it for you (with a backup).",
 
   "//tabs": "Show a vertical tab list on the LEFT side of the terminal panel - it never shrinks like horizontal tabs.",
@@ -35,6 +35,8 @@
 
   "//persist": "Keep terminals across window reloads so the hub survives a restart.",
   "terminal.integrated.enablePersistentSessions": true,
+
+  "//kill": "NOT set here on purpose: `terminal.integrated.confirmOnKill` is written by the ccm-hub extension on activation, and only if you have no value of your own. install.ps1 overwrites a key wholesale, so putting it here would silently override a deliberate `never`.",
 
   "//panel": "Put the terminal panel at the TOP. This only applies to a workspace with no stored panel position: VS Code persists `workbench.panel.position` PER WORKSPACE (0=left 1=right 2=bottom 3=top). The ccm-hub extension converts the workspaces that already have one, once each.",
   "workbench.panel.defaultLocation": "top"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook script.
-# BUILD: 2026-07-10 00:31 v13 project-picker
+# BUILD: 2026-07-10 09:04 v14 close-guard
 #
 # Reads JSON from stdin ({ session_id, transcript_path, cwd, prompt, ... }) and
 # sets the tab title to "<model square> <status> <folder>". The user just

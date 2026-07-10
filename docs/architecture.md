@@ -1,6 +1,6 @@
 # Architecture
 
-**Build:** `2026-07-10 00:31 v13 project-picker`
+**Build:** `2026-07-10 09:04 v14 close-guard`
 
 ## Three problems, three fixes
 
@@ -346,7 +346,10 @@ would silently drop any ids the user had added.
 `Alt+O` itself was chosen by grepping the bundle for keybinding codes
 (`Alt = 512`, `KeyO = 45` → `primary: 557`): **0** hits, versus 3 for `Alt+P`.
 It ships in the extension's `contributes.keybindings`, so it travels with the
-extension and needs no `keybindings.json` edit.
+extension and needs no `keybindings.json` edit. `Alt+Q` (`primary: 559`) was
+picked the same way. `Alt+W` (`565`) looked free and is not — it is
+`toggleFindWholeWord`, scoped to `when: findVisible`, which is true exactly when a
+terminal has focus.
 
 ### Testability
 
@@ -355,6 +358,99 @@ part with real logic — is plain Node and is exercised directly against the liv
 `~/.claude/projects` tree. `extension.js` is driven in tests through a stubbed
 `vscode` module, which is how the "never pass `name` to `createTerminal`"
 invariant below is guarded against regression.
+
+## Not losing a terminal by accident
+
+A terminal here is a live Claude session. One click on the trash icon ended it,
+with no confirmation and no backup.
+
+### There is no `onWillCloseTerminal`
+
+The extension API exposes `onDidCloseTerminal` and nothing else. `onWillCloseTerminal`
+does not appear anywhere in the 1.128 extension host — grep it and you get zero
+hits. **An extension cannot put its own dialog in front of the trash icon.** Every
+design here follows from that one fact; do not go looking for the event again.
+
+### What VS Code *does* give you: `confirmOnKill`
+
+Every built-in kill path — trash icon, middle-click on a tab, `Kill Terminal`,
+`Kill All` — funnels through one method:
+
+```js
+async safeDisposeTerminal(e) {
+  if (!(e.target !== 2 && e.hasChildProcesses &&
+        (config.confirmOnKill === "panel" || config.confirmOnKill === "always") &&
+        await this._showTerminalCloseConfirmation(true)))
+    return new Promise(t => { once(e.onExit)(() => t()), e.dispose(3) })
+}
+```
+
+Two things to read out of it. `e.target !== 2` means the setting's default,
+`"editor"`, confirms only for terminals opened in the **editor area** — a panel
+terminal, which is every terminal ccm opens, is killed silently. So `activate()`
+sets it to `"always"`, and only when `inspect().globalValue` is `undefined`, so a
+user who deliberately chose `"never"` is not overruled.
+
+And `e.hasChildProcesses`: a terminal sitting idle at a bare prompt has none, so
+even `"always"` lets it close without a word. That gap is what the undo below is
+for.
+
+`_showTerminalCloseConfirmation` renders VS Code's own dialog, with one
+`primaryButton` and Cancel. It buys *close vs keep*. It cannot offer *backup*.
+
+### `Alt+Q`: the three-way close we do own
+
+`ccmHub.closeSession` is our command, so its dialog is ours: **גבה וסגור / סגור /
+השאר פתוח**, where "keep" carries `isCloseAffordance: true` so `Esc` and the `X`
+resolve to it. It is bound to `Alt+Q` and contributed to `terminal/title/context`
+and `terminal/context`.
+
+Both entry points act on `window.activeTerminal`, and a right-click on a *background*
+tab is only as safe as VS Code's tab-list activation. The dialog therefore **names
+the folder it is about to close** — an ambiguity the user can see and answer "keep"
+to beats one that silently kills the wrong session.
+
+### Waiting for the backup, via the tab title
+
+"Backup and close" has to know when the backup ended. It reads the glyph the ccm
+hooks already write. VS Code forwards a terminal's resolved title to the extension
+host:
+
+```js
+this._register(t.onAnyInstanceTitleChange(S => S && this._onTitleChanged(S.instanceId, S.title)))
+// -> $acceptTerminalTitleChange(e, n) { getTerminalById(e).name = n }
+```
+
+so `Terminal.name` is a live read of `<model square> <status> <folder>`. Polling it
+for `⟳` / `✓` / `‼` needs no new channel, no IPC, no file watching.
+
+The order of the two waits is the whole trick:
+
+1. **Wait for `⟳` first.** At the moment `/session-backup` is sent, the tab still
+   carries the `✓` from the *previous* turn. A poll that waited for `✓` would fire
+   on that stale glyph and close the terminal instantly, having backed up nothing.
+   `⟳` is proof the prompt was submitted — the `UserPromptSubmit` hook writes it
+   and, unlike `PostToolUse`, is not debounced.
+2. **Then wait for `✓` to hold still** for three consecutive polls, because `Stop`
+   can fire between tool calls mid-backup.
+
+**The invariant:** `backupThenClose` disposes the terminal on exactly one outcome,
+`done`. Timeout, cancellation, `‼` (Claude is asking you something), a terminal
+that died on its own — all leave it open, and say why. A feature built to stop a
+terminal dying by surprise must fail toward a terminal that stays open. The test
+harness asserts each of those five endings separately.
+
+### The undo
+
+`onDidCloseTerminal` gives an `exitStatus.reason`: `Unknown 0, Shutdown 1,
+Process 2, User 3, Extension 4`. Only `User` — trash icon, `Kill Terminal`,
+middle-click — offers a restore. `Process` is claude exiting on its own,
+`Shutdown` is VS Code closing (a modal there would be intolerable), and
+`Extension` is our own `dispose()`, whose three options were just answered.
+
+Restore reopens the folder with `claude --continue`, which resumes the conversation
+from the `.jsonl` transcript under `~/.claude/projects/`. The process was killed;
+the conversation was not.
 
 ## Why Claude Code's own title is disabled
 

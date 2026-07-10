@@ -1,4 +1,4 @@
-# install-extension.ps1  |  BUILD: 2026-07-10 00:31 v13 project-picker
+# install-extension.ps1  |  BUILD: 2026-07-10 09:04 v14 close-guard
 # Side-loads the buildless ccm-hub extension by copying it into VS Code's
 # per-user extensions folder. No npm, no vsce, no admin.
 #
