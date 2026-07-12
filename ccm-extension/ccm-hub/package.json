@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -72,7 +72,7 @@
         "ccmHub.guardTerminalClose": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (only if you have not set it yourself), and offers to restore a Claude session you killed. `Alt+Q` asks *backup / close / keep* regardless of this setting."
+          "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (one terminal) and `#terminal.integrated.confirmOnExit#` to `always` (the whole window's X) — each only if you have not set it yourself — and offers to restore a Claude session you killed. `Alt+Q` asks *backup / close / keep* regardless of this setting."
         }
       }
     }

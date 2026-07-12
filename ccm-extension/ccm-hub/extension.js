@@ -37,7 +37,7 @@ const { rankedProjects, ago } = require('./projects');
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-13 01:00 v16 explain-selection';
+const BUILD = '2026-07-13 12:40 v17 window-close-guard';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
@@ -395,6 +395,27 @@ async function ensureConfirmOnKill() {
   }
 }
 
+// `confirmOnKill` guards ONE terminal (the trash icon, Kill Terminal). It does
+// NOTHING when the whole window closes — click the window's X and VS Code takes
+// every terminal down with it, silently. The window-close path has its own
+// setting: `confirmOnExit`, whose default is "never". "always" makes the X ask
+// first (its built-in dialog even names the count of live terminals), which is
+// the whole point: stop an accidental window close from killing live sessions.
+// An extension cannot intercept the window X itself — there is no cancellable
+// close event — so this built-in setting is the only lever. Fill it only when
+// the user has no opinion of their own, exactly like confirmOnKill above.
+async function ensureConfirmOnExit() {
+  if (!cfg().get('guardTerminalClose', true)) return;
+  const conf = vscode.workspace.getConfiguration('terminal.integrated');
+  const info = conf.inspect('confirmOnExit');
+  if (info && info.globalValue !== undefined) return;
+  try {
+    await conf.update('confirmOnExit', 'always', vscode.ConfigurationTarget.Global);
+  } catch {
+    /* read-only settings.json — nothing else covers the window-close X */
+  }
+}
+
 // VS Code stores the panel position PER WORKSPACE, as the numeric
 // `workbench.panel.position` in that workspace's state.vscdb
 // (0=left, 1=right, 2=bottom, 3=top — from the bundle's positionToString).
@@ -580,6 +601,7 @@ function activate(context) {
 
   ensureSkipShell();
   ensureConfirmOnKill();
+  ensureConfirmOnExit();
 
   // A terminal the user killed is not a session any more — but it is still
   // recoverable, so offer that before forgetting it.

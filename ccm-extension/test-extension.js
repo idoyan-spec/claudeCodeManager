@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-13 01:00 v16 explain-selection
+// test-extension.js  |  BUILD: 2026-07-13 12:40 v17 window-close-guard
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -205,6 +205,8 @@ async function openVia(folder) {
     upd.includes('ccmHub.copyTerminalSelection'), upd);
   assert('turns confirmOnKill on (VS Code defaults to "editor", which skips panel terminals)',
     settingsStore['terminal.integrated'].confirmOnKill === 'always');
+  assert('turns confirmOnExit on (window-close X defaults to "never" and kills every terminal silently)',
+    settingsStore['terminal.integrated'].confirmOnExit === 'always');
 
   log.length = 0;
   ext.activate(context);
@@ -219,11 +221,19 @@ async function openVia(folder) {
     settingsStore['terminal.integrated'].confirmOnKill === 'never' &&
     !log.some((l) => l.startsWith('settings.update:confirmOnKill')));
 
+  settingsStore['terminal.integrated'].confirmOnExit = 'never';
+  log.length = 0;
+  ext.activate(context);
+  await tick();
+  assert("an explicit confirmOnExit of the user's is never overwritten",
+    settingsStore['terminal.integrated'].confirmOnExit === 'never' &&
+    !log.some((l) => l.startsWith('settings.update:confirmOnExit')));
+
   console.log('\npicker');
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v16 explain-selection')));
+  assert('title carries the build stamp', log.some((l) => l.includes('v17 window-close-guard')));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 
