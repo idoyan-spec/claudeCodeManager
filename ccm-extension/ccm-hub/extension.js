@@ -37,11 +37,15 @@ const { rankedProjects, ago } = require('./projects');
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-12 20:45 v15 keycode-dispatch';
+const BUILD = '2026-07-13 01:00 v16 explain-selection';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
-const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND];
+// Ctrl+Alt+Insert -> copy the terminal selection. The voice service synthesizes this
+// keychord to read what the user selected before deciding explain-vs-record; it must be
+// in commandsToSkipShell or the terminal would swallow it. copySelection never SIGINTs.
+const PROBE_COMMAND = 'ccmHub.copyTerminalSelection';
+const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND];
 const MRU_KEY = 'ccmHub.mru';
 
 // The status glyphs the ccm hooks write into the tab title, from
@@ -404,6 +408,165 @@ async function ensureConfirmOnKill() {
 // that have no stored position yet; this converts the ones that do.
 const PANEL_TOP_KEY = 'ccmHub.panelTopApplied';
 
+// ---------------------------------------------------------------------------
+// Explain a terminal selection in plain Hebrew
+// ---------------------------------------------------------------------------
+//
+// The voice service (which owns Right Ctrl) detects a terminal selection, asks a
+// cheap model for a plain-Hebrew explanation, writes {original, explanation, ...} to
+// a temp JSON file, and fires `vscode://ccm.hub/explain?f=<file>`. We read the file,
+// render a floating RTL card, and delete the file. A file — not URI query args —
+// carries long Hebrew text without length or encoding trouble.
+//
+// The card is technically an editor-area webview (VS Code exposes no true floating
+// window to extensions), but it takes focus, closes on Esc and its ✕ button, and
+// closes the moment focus leaves it (a click on the terminal) — so it behaves like
+// the floating card the user asked for. The explanation is rendered in a real RTL
+// container, which is the reversed-Hebrew problem finally solved on the output side.
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function explainHtml(payload) {
+  const original = escapeHtml(payload.original || '');
+  const explanation = escapeHtml(payload.explanation || '');
+  const ok = payload.ok !== false;
+  const meta = escapeHtml(`${payload.model || ''} · ccm ${payload.build || ''}`);
+  const answerClass = ok ? 'answer' : 'answer error';
+
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 18px 20px 16px;
+    font-family: var(--vscode-font-family, "Segoe UI", system-ui, sans-serif);
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-background);
+    direction: rtl;
+  }
+  .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .title { font-size: 15px; font-weight: 600; flex: 1; }
+  .close {
+    all: unset; cursor: pointer; font-size: 18px; line-height: 1;
+    padding: 2px 8px; border-radius: 6px; opacity: .7;
+  }
+  .close:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.2)); }
+  .answer {
+    font-size: 15px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+    background: var(--vscode-textBlockQuote-background, rgba(128,128,128,.08));
+    border-right: 3px solid var(--vscode-focusBorder, #007acc);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .answer.error { border-right-color: var(--vscode-errorForeground, #e5484d); }
+  .snip-wrap { margin-top: 14px; }
+  .snip-label {
+    font-size: 12px; opacity: .7; margin-bottom: 6px; cursor: pointer; user-select: none;
+  }
+  .snip {
+    direction: ltr; text-align: left; unicode-bidi: plaintext;
+    font-family: var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
+    font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    max-height: 160px; overflow: auto;
+    background: var(--vscode-textCodeBlock-background, rgba(128,128,128,.12));
+    border-radius: 6px; padding: 10px 12px; margin: 0;
+  }
+  .snip.hidden { display: none; }
+  .foot {
+    display: flex; align-items: center; gap: 12px; margin-top: 14px;
+    font-size: 11.5px; opacity: .6;
+  }
+  .foot .spacer { flex: 1; }
+  .btn {
+    all: unset; cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px;
+    background: var(--vscode-button-secondaryBackground, rgba(128,128,128,.18));
+    color: var(--vscode-button-secondaryForeground, inherit);
+  }
+  .btn:hover { background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,.3)); }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="title">🧠 הסבר</div>
+    <button class="close" id="close" title="סגור (Esc)">✕</button>
+  </div>
+  <div class="${answerClass}" id="answer">${explanation}</div>
+  <div class="snip-wrap">
+    <div class="snip-label" id="toggle">▸ הטקסט שסימנת</div>
+    <pre class="snip hidden" id="snip">${original}</pre>
+  </div>
+  <div class="foot">
+    <button class="btn" id="copy">העתק הסבר</button>
+    <span class="spacer"></span>
+    <span>Esc או לחיצה על הטרמינל לסגירה · ${meta}</span>
+  </div>
+<script>
+  const vscode = acquireVsCodeApi();
+  document.getElementById('close').addEventListener('click', () => vscode.postMessage({ type: 'close' }));
+  document.getElementById('copy').addEventListener('click', () => vscode.postMessage({ type: 'copy' }));
+  const snip = document.getElementById('snip');
+  const toggle = document.getElementById('toggle');
+  toggle.addEventListener('click', () => {
+    const hidden = snip.classList.toggle('hidden');
+    toggle.textContent = (hidden ? '▸' : '▾') + ' הטקסט שסימנת';
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') vscode.postMessage({ type: 'close' }); });
+  window.focus();
+</script>
+</body>
+</html>`;
+}
+
+function showExplanation(payload) {
+  const panel = vscode.window.createWebviewPanel(
+    'ccmExplain',
+    '🧠 הסבר',
+    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
+    { enableScripts: true, retainContextWhenHidden: false }
+  );
+  panel.webview.html = explainHtml(payload || {});
+
+  panel.webview.onDidReceiveMessage((m) => {
+    if (!m) return;
+    if (m.type === 'close') panel.dispose();
+    if (m.type === 'copy') {
+      vscode.env.clipboard.writeText(String(payload.explanation || ''));
+      vscode.window.setStatusBarMessage('ccm: ההסבר הועתק', 2000);
+    }
+  });
+
+  // Close on blur — the moment focus leaves the card (e.g. a click back on the
+  // terminal), it disposes. That is the "floating card that closes when I click
+  // away" behaviour. The first state change is active=true (the panel taking focus),
+  // which does not dispose.
+  panel.onDidChangeViewState((e) => {
+    if (!e.webviewPanel.active) panel.dispose();
+  });
+}
+
+function handleExplainUri(uri) {
+  const params = new URLSearchParams(uri.query || '');
+  const f = params.get('f');
+  if (!f) return;
+  let payload;
+  try {
+    payload = JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch (err) {
+    vscode.window.showErrorMessage('ccm: could not read explanation payload — ' + err.message);
+  }
+  try { fs.unlinkSync(f); } catch { /* best effort */ }
+  if (payload) showExplanation(payload);
+}
+
 function activate(context) {
   // Once per workspace: move the panel to the top. If the user later drags it
   // back, the flag is already set for this workspace and we never fight them.
@@ -432,6 +595,10 @@ function activate(context) {
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri) {
+        // Route by path: `/explain` shows a Hebrew explanation card, everything else
+        // (incl. `/session` and the legacy no-path form) opens a session.
+        const route = (uri.path || '').replace(/^\/+/, '');
+        if (route === 'explain') return handleExplainUri(uri);
         // uri.query is the raw (encoded) query string; URLSearchParams decodes it.
         const params = new URLSearchParams(uri.query || '');
         openSession(params.get('path') || '');
@@ -445,6 +612,14 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(CLOSE_COMMAND, () => closeSession())
+  );
+
+  // The probe: copy the terminal selection so the voice service can read it. A thin
+  // wrapper over the built-in so we own its keybinding, when-clause and skip-shell entry.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(PROBE_COMMAND, () =>
+      vscode.commands.executeCommand('workbench.action.terminal.copySelection')
+    )
   );
 
   context.subscriptions.push(

@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-10 09:04 v14 close-guard
+// test-extension.js  |  BUILD: 2026-07-13 01:00 v16 explain-selection
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -40,6 +40,7 @@ let warningChoice = null; // index into the items passed to showWarningMessage
 let lastWarningItems = null;
 let lastWarningMessage = null;
 let cancelProgressAfterMs = null;
+let lastWebview = null;
 const settingsStore = { 'terminal.integrated': { commandsToSkipShell: ['existing.user.command'] } };
 const ccmSettings = { projectsRoot: ROOT, claudeCommand: 'claude --dangerously-skip-permissions' };
 
@@ -63,6 +64,8 @@ const vscodeStub = {
   ThemeIcon: class { constructor(id) { this.id = id; } },
   ConfigurationTarget: { Global: 1 },
   ProgressLocation: { Notification: 15 },
+  ViewColumn: { Active: -1, Beside: -2 },
+  env: { clipboard: { writeText: (t) => { log.push('clipboard.write:' + t); return Promise.resolve(); } } },
   TerminalExitReason: { Unknown: 0, Shutdown: 1, Process: 2, User: 3, Extension: 4 },
   commands: {
     _handlers: {},
@@ -106,7 +109,22 @@ const vscodeStub = {
       return task({ report() {} }, token);
     },
     registerUriHandler(h) { this._uri = h; return { dispose() {} }; },
-    onDidCloseTerminal(fn) { this._onClose = fn; return { dispose() {} }; }
+    onDidCloseTerminal(fn) { this._onClose = fn; return { dispose() {} }; },
+    setStatusBarMessage(m) { log.push('status:' + m); return { dispose() {} }; },
+    createWebviewPanel(viewType, title, showOpts, options) {
+      const panel = {
+        viewType, title, active: true,
+        webview: { html: '', onDidReceiveMessage(fn) { this._msg = fn; return { dispose() {} }; } },
+        _viewStateFns: [],
+        onDidChangeViewState(fn) { this._viewStateFns.push(fn); return { dispose() {} }; },
+        _fireViewState(active) { this.active = active; this._viewStateFns.forEach((fn) => fn({ webviewPanel: this })); },
+        dispose() { log.push('webview.dispose'); },
+        reveal() {}
+      };
+      log.push('createWebviewPanel:' + viewType);
+      lastWebview = panel;
+      return panel;
+    }
   },
   workspace: {
     getConfiguration(section) {
@@ -180,10 +198,11 @@ async function openVia(folder) {
   await tick();
   assert('panel moved to top', log.includes('executeCommand:workbench.action.positionPanelTop'));
   const upd = log.find((l) => l.startsWith('settings.update:commandsToSkipShell'));
-  assert('registers both commands in commandsToSkipShell', !!upd);
+  assert('registers all three commands in commandsToSkipShell', !!upd);
   assert("keeps the user's existing skip-shell entries",
     !!upd && upd.includes('existing.user.command') &&
-    upd.includes('ccmHub.openProjectPicker') && upd.includes('ccmHub.closeSession'), upd);
+    upd.includes('ccmHub.openProjectPicker') && upd.includes('ccmHub.closeSession') &&
+    upd.includes('ccmHub.copyTerminalSelection'), upd);
   assert('turns confirmOnKill on (VS Code defaults to "editor", which skips panel terminals)',
     settingsStore['terminal.integrated'].confirmOnKill === 'always');
 
@@ -204,7 +223,7 @@ async function openVia(folder) {
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v14 close-guard')));
+  assert('title carries the build stamp', log.some((l) => l.includes('v16 explain-selection')));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 
@@ -247,6 +266,56 @@ async function openVia(folder) {
   vscodeStub.window._uri.handleUri({ query: 'path=' + encodeURIComponent("E:\\tmp\\it's; rm -rf x") });
   const evil = log.find((l) => l.startsWith('sendText:'));
   assert("a quote in the folder name stays inside the PowerShell literal", !!evil && evil.includes("it''s"), evil);
+
+  // ---- explain-on-selection route -----------------------------------------
+  console.log('\nexplain: the floating card');
+  const osT = require('os');
+  const fsT = require('fs');
+  const payloadFile = path.join(osT.tmpdir(), 'ccm_explain_test_' + process.pid + '.json');
+  fsT.writeFileSync(payloadFile, JSON.stringify({
+    original: 'idempotent <script>x</script>',
+    explanation: 'זהו הסבר בעברית פשוטה על המונח.',
+    ok: true, model: 'gemini-flash-lite-latest', build: 'test'
+  }), 'utf8');
+
+  log.length = 0;
+  lastWebview = null;
+  vscodeStub.window._uri.handleUri({ path: '/explain', query: 'f=' + encodeURIComponent(payloadFile) });
+  assert('the explain route opens a webview, not a terminal',
+    !!lastWebview && !log.some((l) => l.startsWith('createTerminal')));
+  assert('the explain route deletes the temp payload file after reading it',
+    !fsT.existsSync(payloadFile));
+  assert('the card renders the Hebrew explanation',
+    !!lastWebview && lastWebview.webview.html.includes('זהו הסבר בעברית פשוטה על המונח.'));
+  assert('the card is RTL', !!lastWebview && lastWebview.webview.html.includes('dir="rtl"'));
+  assert('the card escapes HTML from the selected snippet (no injection)',
+    !!lastWebview && lastWebview.webview.html.includes('&lt;script&gt;') &&
+    !lastWebview.webview.html.includes('<script>x</script>'));
+
+  // The "click on the terminal" behaviour: losing focus disposes the card.
+  log.length = 0;
+  lastWebview._fireViewState(false);
+  assert('the card closes when focus leaves it (click on the terminal)',
+    log.some((l) => l === 'webview.dispose'));
+
+  // A malformed/missing payload must not open a terminal or throw.
+  log.length = 0;
+  lastWebview = null;
+  vscodeStub.window._uri.handleUri({ path: '/explain', query: 'f=' + encodeURIComponent(path.join(osT.tmpdir(), 'ccm_no_such_file.json')) });
+  assert('a missing payload file opens nothing and errors quietly',
+    !lastWebview && !log.some((l) => l.startsWith('createTerminal')));
+
+  // The route split must not have broken session opening via an explicit /session path.
+  log.length = 0;
+  vscodeStub.window._uri.handleUri({ path: '/session', query: 'path=' + encodeURIComponent('E:\\MAIN_CLAUDE\\SessionRouteTest') });
+  assert('the /session path still opens a terminal',
+    log.some((l) => l.startsWith('createTerminal:')));
+
+  // The probe command is a thin wrapper over the built-in terminal copySelection.
+  log.length = 0;
+  await vscodeStub.commands._handlers['ccmHub.copyTerminalSelection']();
+  assert('the probe command copies the terminal selection (never SIGINT)',
+    log.some((l) => l === 'executeCommand:workbench.action.terminal.copySelection'));
 
   // ---- the three-way close -------------------------------------------------
   const closeCmd = vscodeStub.commands._handlers['ccmHub.closeSession'];
