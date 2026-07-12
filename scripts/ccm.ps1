@@ -3,7 +3,7 @@
   Opens a folder as a Claude Code session in the CURRENT VS Code terminal tab,
   naming the tab after the folder so the vertical tab list stays readable.
 
-  BUILD: 2026-07-07 v1 vscode-hub
+  BUILD: 2026-07-12 20:45 v15 keycode-dispatch
 #>
 [CmdletBinding()]
 param(
@@ -13,7 +13,7 @@ param(
     [switch]$Help
 )
 
-$BUILD = '2026-07-07 v1 vscode-hub'
+$BUILD = '2026-07-12 20:45 v15 keycode-dispatch'
 
 function Set-TabTitle([string]$Text) {
     # OSC 0 ; <text> BEL  -> sets the terminal tab/window title.

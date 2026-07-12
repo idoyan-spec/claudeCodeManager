@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-10 09:04 v14 close-guard
+// ccm-hub  |  BUILD: 2026-07-12 20:45 v15 keycode-dispatch
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI or by the Alt+O project picker. No SendKeys, no
 // focus games — the Terminal API.
@@ -6,6 +6,14 @@
 // URI:  vscode://ccm.hub/session?path=<percent-encoded folder>
 // Key:  Alt+O  ->  ccmHub.openProjectPicker
 // Key:  Alt+Q  ->  ccmHub.closeSession      (backup / close / keep)
+//
+// Both keys are LETTER bindings, and VS Code's default `keyboard.dispatch: "code"`
+// resolves them by finding the physical key that produces that letter on the ACTIVE
+// keyboard layout. With a Hebrew layout active no key produces "o" or "q", so the
+// bindings become unresolvable and the keypress falls through to the shell — the
+// picker never opens. The installer sets `keyboard.dispatch: "keyCode"` (dispatch by
+// hardware key position, layout-independent) so Alt+O/Alt+Q fire under any layout.
+// Arrow-key bindings (Alt+Up/Down) never had this problem — they carry no character.
 //
 // Status and model live in the tab TITLE, not here. VS Code freezes a terminal's
 // icon and color at createTerminal() time — `Terminal` exposes no setter for
@@ -29,7 +37,7 @@ const { rankedProjects, ago } = require('./projects');
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-10 09:04 v14 close-guard';
+const BUILD = '2026-07-12 20:45 v15 keycode-dispatch';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';

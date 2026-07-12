@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-10 09:04 v14 close-guard`
+**Build:** `2026-07-12 20:45 v15 keycode-dispatch`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each

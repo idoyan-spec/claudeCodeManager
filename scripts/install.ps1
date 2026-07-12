@@ -9,12 +9,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-10 09:04 v14 close-guard
+  BUILD: 2026-07-12 20:45 v15 keycode-dispatch
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-10 09:04 v14 close-guard'
+$BUILD = '2026-07-12 20:45 v15 keycode-dispatch'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 
@@ -72,6 +72,14 @@ $want = [ordered]@{
     # `workbench.panel.position` per workspace, so already-opened folders keep their
     # bottom panel until the ccm-hub extension converts them (once each).
     'workbench.panel.defaultLocation'              = 'top'
+    # Load-bearing for Alt+O / Alt+Q. VS Code's default dispatch ("code") resolves a
+    # letter binding like `alt+o` by finding the physical key that produces "o" on the
+    # ACTIVE keyboard layout. With a Hebrew layout active no key produces "o", so the
+    # binding is unresolvable and the keypress falls through to the shell — while
+    # arrow-key bindings (Alt+Up/Down) keep working because they carry no character.
+    # "keyCode" dispatches by the raw hardware key position (US layout) regardless of
+    # the active layout, so alt+o always = the physical O key. Requires a window reload.
+    'keyboard.dispatch'                            = 'keyCode'
 }
 
 # Merged separately: colorCustomizations is a nested object owned by the user,
