@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-13 12:40 v17 window-close-guard
+// test-extension.js  |  BUILD: 2026-07-14 22:40 v18 md-rtl-pdf
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -37,6 +37,7 @@ const log = [];
 let quickPickItems = null;
 let quickPickChoice = null;
 let warningChoice = null; // index into the items passed to showWarningMessage
+let infoChoice = null;    // index into the actions passed to showInformationMessage
 let lastWarningItems = null;
 let lastWarningMessage = null;
 let cancelProgressAfterMs = null;
@@ -65,7 +66,11 @@ const vscodeStub = {
   ConfigurationTarget: { Global: 1 },
   ProgressLocation: { Notification: 15 },
   ViewColumn: { Active: -1, Beside: -2 },
-  env: { clipboard: { writeText: (t) => { log.push('clipboard.write:' + t); return Promise.resolve(); } } },
+  Uri: { file: (p) => ({ fsPath: p, scheme: 'file', toString: () => 'file://' + p }) },
+  env: {
+    clipboard: { writeText: (t) => { log.push('clipboard.write:' + t); return Promise.resolve(); } },
+    openExternal: (u) => { log.push('openExternal:' + (u && u.fsPath)); return Promise.resolve(true); }
+  },
   TerminalExitReason: { Unknown: 0, Shutdown: 1, Process: 2, User: 3, Extension: 4 },
   commands: {
     _handlers: {},
@@ -75,6 +80,7 @@ const vscodeStub = {
   window: {
     _terms: [],
     activeTerminal: undefined,
+    activeTextEditor: undefined,
     createTerminal(opts) {
       log.push('createTerminal:' + opts.cwd + ' name=' + (opts.name === undefined ? '<none>' : opts.name));
       const t = makeTerminal(opts);
@@ -89,7 +95,12 @@ const vscodeStub = {
     },
     showInputBox: () => Promise.resolve(undefined),
     showErrorMessage: (m) => { log.push('ERROR:' + m); return Promise.resolve(undefined); },
-    showInformationMessage: (m) => { log.push('INFO:' + m); return Promise.resolve(undefined); },
+    // Returns the action at `infoChoice` (a string label passed after the message),
+    // so a test can drive the "Open PDF" / "Reveal" follow-up. Default: no choice.
+    showInformationMessage: (m, ...actions) => {
+      log.push('INFO:' + m);
+      return Promise.resolve(infoChoice === null ? undefined : actions[infoChoice]);
+    },
     // Handles both overloads: (msg, options, ...items) and (msg, ...actions).
     showWarningMessage(message, ...rest) {
       const items = rest.length && rest[0] && typeof rest[0] === 'object' && 'modal' in rest[0]
@@ -127,6 +138,11 @@ const vscodeStub = {
     }
   },
   workspace: {
+    textDocuments: [],
+    openTextDocument: (uri) => {
+      const d = vscodeStub.workspace.textDocuments.find((x) => x.uri.fsPath === (uri && uri.fsPath));
+      return d ? Promise.resolve(d) : Promise.reject(new Error('not found'));
+    },
     getConfiguration(section) {
       if (section === 'ccmHub') {
         return { get: (k, d) => (k in ccmSettings ? ccmSettings[k] : d) };
@@ -148,6 +164,26 @@ Module._resolveFilename = function (req, ...rest) {
   return req === 'vscode' ? 'vscode-stub' : origResolve.call(this, req, ...rest);
 };
 require.cache['vscode-stub'] = { id: 'vscode-stub', filename: 'vscode-stub', loaded: true, exports: vscodeStub };
+
+// Stub the PDF renderer so tests never spawn a real browser. `renderResult`/
+// `renderError` let each test drive its return value; `renderCalls` records how the
+// command invoked it (which .md, which .pdf, which forced direction).
+const renderCalls = [];
+let renderResult = { dir: 'rtl' };
+let renderError = null;
+const renderPath = require.resolve(path.join(EXT_DIR, 'md2pdf', 'render.js'));
+require.cache[renderPath] = {
+  id: renderPath, filename: renderPath, loaded: true,
+  exports: {
+    exportMarkdownToPdf: (opts) => {
+      renderCalls.push(opts);
+      if (renderError) return Promise.reject(renderError);
+      return Promise.resolve({ pdfPath: opts.pdfPath, dir: renderResult.dir, browser: 'chrome.exe' });
+    },
+    detectDir: () => 'rtl',
+    findBrowser: () => 'chrome.exe'
+  }
+};
 
 const ext = require(path.join(EXT_DIR, 'extension.js'));
 const { rankedProjects, encodeProjectDir, ago } = require(path.join(EXT_DIR, 'projects.js'));
@@ -233,7 +269,7 @@ async function openVia(folder) {
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v17 window-close-guard')));
+  assert('title carries the build stamp', log.some((l) => l.includes('v18 md-rtl-pdf')));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 
@@ -326,6 +362,94 @@ async function openVia(folder) {
   await vscodeStub.commands._handlers['ccmHub.copyTerminalSelection']();
   assert('the probe command copies the terminal selection (never SIGINT)',
     log.some((l) => l === 'executeCommand:workbench.action.terminal.copySelection'));
+
+  // ---- Markdown -> PDF (RTL) ----------------------------------------------
+  console.log('\nexport: Markdown to PDF (RTL)');
+  const exportCmd = vscodeStub.commands._handlers['ccmHub.exportMarkdownPdf'];
+
+  function makeDoc(o) {
+    const d = {
+      uri: { fsPath: o.fsPath, scheme: 'file' },
+      languageId: o.languageId || 'markdown',
+      isUntitled: !!o.isUntitled,
+      isDirty: !!o.isDirty,
+      save() { d.isDirty = false; log.push('doc.save:' + o.fsPath); return Promise.resolve(true); }
+    };
+    return d;
+  }
+  function registerDoc(d) {
+    vscodeStub.workspace.textDocuments = [d];
+    vscodeStub.window.activeTextEditor = { document: d };
+  }
+
+  // The command is registered so the editor-title button can invoke it.
+  assert('the export command is registered', typeof exportCmd === 'function');
+
+  // Editor-title button: it passes the tab's Uri as the argument.
+  const mdA = 'E:\\MAIN_CLAUDE\\claudeCodeManager\\README.md';
+  registerDoc(makeDoc({ fsPath: mdA }));
+  renderCalls.length = 0; renderResult = { dir: 'rtl' }; renderError = null; infoChoice = null;
+  log.length = 0;
+  await exportCmd({ fsPath: mdA });
+  assert('the button exports the clicked Markdown file',
+    renderCalls.length === 1 && renderCalls[0].mdPath === mdA, JSON.stringify(renderCalls));
+  assert('the PDF is written beside the .md with a .pdf name',
+    renderCalls.length === 1 && renderCalls[0].pdfPath === 'E:\\MAIN_CLAUDE\\claudeCodeManager\\README.pdf',
+    renderCalls[0] && renderCalls[0].pdfPath);
+  assert('direction is left to auto-detection (never forced)',
+    renderCalls.length === 1 && renderCalls[0].dir === undefined, JSON.stringify(renderCalls[0]));
+  assert('a progress notification is shown', log.some((l) => l.startsWith('progress:')));
+
+  // A dirty buffer is saved first, so the PDF reflects what is on screen.
+  const dirtyDoc = makeDoc({ fsPath: mdA, isDirty: true });
+  registerDoc(dirtyDoc);
+  renderCalls.length = 0; log.length = 0; infoChoice = null;
+  await exportCmd({ fsPath: mdA });
+  assert('a dirty document is saved before exporting',
+    log.indexOf('doc.save:' + mdA) !== -1 && renderCalls.length === 1 &&
+    log.indexOf('doc.save:' + mdA) < log.findIndex((l) => l.startsWith('progress:')),
+    JSON.stringify(log));
+
+  // Command Palette path: no argument, so it falls back to the active editor.
+  registerDoc(makeDoc({ fsPath: mdA }));
+  renderCalls.length = 0; infoChoice = null;
+  await exportCmd();
+  assert('with no argument it exports the active editor',
+    renderCalls.length === 1 && renderCalls[0].mdPath === mdA);
+
+  // "Open PDF" opens the result in the OS.
+  registerDoc(makeDoc({ fsPath: mdA }));
+  renderCalls.length = 0; log.length = 0; infoChoice = 0; // OPEN is the first action
+  await exportCmd({ fsPath: mdA });
+  assert('choosing "Open PDF" opens the file externally',
+    log.some((l) => l === 'openExternal:E:\\MAIN_CLAUDE\\claudeCodeManager\\README.pdf'), JSON.stringify(log));
+
+  // An untitled buffer has no folder to resolve images/base href against.
+  registerDoc(makeDoc({ fsPath: 'Untitled-1', isUntitled: true }));
+  renderCalls.length = 0; log.length = 0; infoChoice = null;
+  await exportCmd();
+  assert('an untitled buffer is refused (nothing rendered)',
+    renderCalls.length === 0 && log.some((l) => l.startsWith('WARN:')), JSON.stringify(log));
+
+  // A non-Markdown editor is not exported.
+  registerDoc(makeDoc({ fsPath: 'E:\\x\\app.js', languageId: 'javascript' }));
+  renderCalls.length = 0; log.length = 0; infoChoice = null;
+  await exportCmd();
+  assert('a non-Markdown editor is not exported',
+    renderCalls.length === 0 && log.some((l) => l.startsWith('INFO:')), JSON.stringify(log));
+
+  // A render failure surfaces an error, never throws.
+  registerDoc(makeDoc({ fsPath: mdA }));
+  renderCalls.length = 0; log.length = 0; infoChoice = null;
+  renderError = new Error('No Chrome or Edge found');
+  await exportCmd({ fsPath: mdA });
+  renderError = null;
+  assert('a render failure reports an error and does not throw',
+    log.some((l) => l.startsWith('ERROR:') && l.includes('No Chrome or Edge')), JSON.stringify(log));
+
+  // Leave no stray editor state for the close tests that follow.
+  vscodeStub.window.activeTextEditor = undefined;
+  vscodeStub.workspace.textDocuments = [];
 
   // ---- the three-way close -------------------------------------------------
   const closeCmd = vscodeStub.commands._handlers['ccmHub.closeSession'];

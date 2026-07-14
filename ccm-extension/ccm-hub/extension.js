@@ -32,12 +32,16 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { rankedProjects, ago } = require('./projects');
+// MD -> PDF with correct RTL. A buildless module that renders the Markdown with a
+// vendored marked and prints it with the Edge/Chrome already on the machine, so
+// there is no npm dependency and no bundled Chromium. See md2pdf/render.js.
+const { exportMarkdownToPdf } = require('./md2pdf/render');
 
 // A static icon so a Claude session is distinguishable from a plain shell tab.
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-13 12:40 v17 window-close-guard';
+const BUILD = '2026-07-14 22:40 v18 md-rtl-pdf';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
@@ -45,6 +49,9 @@ const CLOSE_COMMAND = 'ccmHub.closeSession';
 // keychord to read what the user selected before deciding explain-vs-record; it must be
 // in commandsToSkipShell or the terminal would swallow it. copySelection never SIGINTs.
 const PROBE_COMMAND = 'ccmHub.copyTerminalSelection';
+// Export the active Markdown file to a PDF beside it, with RTL auto-detected from
+// the content. Contributed as an editor-title button that only shows for Markdown.
+const EXPORT_PDF_COMMAND = 'ccmHub.exportMarkdownPdf';
 const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND];
 const MRU_KEY = 'ccmHub.mru';
 
@@ -588,6 +595,79 @@ function handleExplainUri(uri) {
   if (payload) showExplanation(payload);
 }
 
+// ---------------------------------------------------------------------------
+// Export the active Markdown to a PDF, with RTL that the VS Code preview and the
+// editor itself cannot give. VS Code has no API to flip a text editor to RTL (a
+// years-open feature request), and the built-in preview has no export at all — so
+// a Hebrew .md had no route to a correctly right-aligned PDF. This does it: render
+// with marked, print with the installed browser, direction auto-detected. `arg`
+// may be a Uri when the command is fired from the editor-title button.
+async function exportMarkdownPdf(arg) {
+  // Resolve which Markdown file to export: the button passes the tab's Uri; the
+  // Command Palette passes nothing, so fall back to the active editor.
+  let doc;
+  if (arg && arg.fsPath) {
+    doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === arg.fsPath);
+    if (!doc) {
+      try { doc = await vscode.workspace.openTextDocument(arg); } catch { /* ignore */ }
+    }
+  }
+  if (!doc) {
+    const ed = vscode.window.activeTextEditor;
+    if (ed) doc = ed.document;
+  }
+  if (!doc) {
+    vscode.window.showInformationMessage('ccm: פתח קובץ Markdown כדי לייצא ל-PDF.');
+    return;
+  }
+
+  const isMd =
+    doc.languageId === 'markdown' || /\.(md|markdown)$/i.test(doc.uri.fsPath || '');
+  if (!isMd) {
+    vscode.window.showInformationMessage('ccm: הקובץ הפעיל אינו Markdown.');
+    return;
+  }
+
+  // The base href and relative images need the document's real folder, so an
+  // untitled buffer has nowhere to resolve against — ask the user to save first.
+  if (doc.isUntitled) {
+    vscode.window.showWarningMessage('ccm: שמור את הקובץ (Ctrl+S) לפני ייצוא ל-PDF.');
+    return;
+  }
+  // Export what is on screen, not the last save.
+  if (doc.isDirty) { await doc.save(); }
+
+  const mdPath = doc.uri.fsPath;
+  const pdfPath = mdPath.replace(/\.(md|markdown)$/i, '') + '.pdf';
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `ccm: מייצא «${path.basename(mdPath)}» ל-PDF…`,
+      cancellable: false
+    },
+    async () => {
+      try {
+        const { dir } = await exportMarkdownToPdf({ mdPath, pdfPath });
+        const arabicOrHebrew = dir === 'rtl' ? 'RTL' : 'LTR';
+        const OPEN = 'פתח PDF';
+        const REVEAL = 'הצג בתיקייה';
+        const pick = await vscode.window.showInformationMessage(
+          `ccm: נוצר PDF (${arabicOrHebrew}) — ${path.basename(pdfPath)}`,
+          OPEN,
+          REVEAL
+        );
+        if (pick === OPEN) vscode.env.openExternal(vscode.Uri.file(pdfPath));
+        if (pick === REVEAL) {
+          vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(pdfPath));
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage('ccm: ייצוא ל-PDF נכשל — ' + (err && err.message));
+      }
+    }
+  );
+}
+
 function activate(context) {
   // Once per workspace: move the panel to the top. If the user later drags it
   // back, the flag is already set for this workspace and we never fight them.
@@ -642,6 +722,10 @@ function activate(context) {
     vscode.commands.registerCommand(PROBE_COMMAND, () =>
       vscode.commands.executeCommand('workbench.action.terminal.copySelection')
     )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(EXPORT_PDF_COMMAND, (arg) => exportMarkdownPdf(arg))
   );
 
   context.subscriptions.push(

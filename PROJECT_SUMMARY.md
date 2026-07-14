@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm) - סיכום פרויקט
 
-**גרסה / Build:** `2026-07-13 01:00 v16 explain-selection`
+**גרסה / Build:** `2026-07-14 22:55 v18 md-rtl-pdf`
 
 ## תיאור כללי
 סביבת עבודה מרוכזת להרצת הרבה סשני Claude Code במקביל, בתוך **חלון VS Code אחד**,
@@ -12,7 +12,10 @@
 | קובץ | תפקיד |
 |-------|--------|
 | `scripts/ccm.ps1` | המשגר: פותח תיקייה כסשן בטאב הנוכחי, נותן לטאב את שם התיקייה ומריץ `claude` |
+| `scripts/bootstrap.ps1` | **נקודת-הכניסה היחידה** להתקנה/עדכון על כל מחשב: `git pull` (עדכון), מתקין את Claude עצמו אם חסר, מריץ `install.ps1` ואת מתקין התוסף. הרצה חוזרת = עדכון |
 | `scripts/install.ps1` | מתקין אידמפוטנטי: רושם את `ccm` ב-PROFILE, ממזג הגדרות VS Code (עם גיבוי), **מפיץ** את ההוקים ומאמת אותם |
+| `ccm-extension/ccm-hub/md2pdf/render.js` | מנוע MD→PDF עם RTL: marked מוטמע (ללא npm) בונה HTML, ו-Chrome/Edge headless (`--print-to-pdf`) מדפיס. כיווניות מזוהה אוטומטית מהתוכן. שמיש כ-`require` וגם כ-CLI |
+| `ccm-extension/ccm-hub/md2pdf/marked.min.js` | marked v12 (MIT) מוטמע — פרסר Markdown חד-קבצי, בלי תלות רשת/npm |
 | `vscode/settings-snippet.json` | הגדרות הטרמינל של VS Code למיזוג |
 | `vscode/keybindings-snippet.json` | קיצורי המקשים לפוקוס: `↑/↓` ברשימת הטאבים, `Ctrl+↑/↓` בתוך טרמינל |
 | `docs/architecture.md` | איך זה עובד + פרופיל משאבים/אבטחה |
@@ -21,7 +24,7 @@
 | `hooks/_model-glyph.sh` | מזהה את המודל מה-transcript (סינון sidechain) ובונה את הכותרת `<ריבוע-מודל> <סטטוס> <תיקייה>` |
 | `.gitattributes` | מכריח LF ב-`*.sh` (autocrlf היה מוציא CRLF ב-clone, ו-bash דוחה shebang שנגמר ב-`\r`) |
 | `USER_GUIDE.md` / `USER_GUIDE.html` | חוברת הסבר למשתמש (עברית) |
-| `ccm-extension/ccm-hub/extension.js` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` + **בורר הפרויקטים ב-`Alt+O`** + **שומר הסגירה ב-`Alt+Q`**; פותח טרמינל חדש בחלון הקיים ומריץ Claude |
+| `ccm-extension/ccm-hub/extension.js` | תוסף VS Code (JS, buildless): URI handler `vscode://ccm.hub/session` + **בורר הפרויקטים ב-`Alt+O`** + **שומר הסגירה ב-`Alt+Q`** + **כפתור ייצוא MD→PDF (RTL)** בסרגל-הכלים של קובץ Markdown; פותח טרמינל חדש בחלון הקיים ומריץ Claude |
 | `ccm-extension/test-extension.js` | 46 בדיקות מול `vscode` מזויף (`Module._resolveFilename`); שומר על שני האינווריאנטים: אין `name` ל-`createTerminal`, ואין סגירת טרמינל על ספק |
 | `ccm-extension/ccm-hub/projects.js` | דירוג "לפי מה שנכנסתי אליו לאחרונה" — Node טהור, ללא `vscode`, ולכן ניתן לבדיקה מחוץ ל-VS Code |
 | `ccm-extension/install-extension.ps1` | side-load של התוסף ל-`~/.vscode/extensions` (ללא npm/admin) |
@@ -105,11 +108,25 @@
     שמחזיר את השיחה מה-`.jsonl` — התהליך נהרג, השיחה לא.
 
 ## איך להשתמש
-### התקנה / הכנה
+### התקנה על מחשב חדש / עדכון (מומלץ) — פקודה אחת
+```powershell
+git clone https://github.com/idoyan-spec/claudeCodeManager.git
+cd claudeCodeManager
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+```
+`bootstrap.ps1` הוא **נקודת-הכניסה היחידה**: מושך את הריפו (`git pull`), מתקין את Claude אם חסר,
+מריץ את `install.ps1` ומתקין את התוסף. **הרצה חוזרת = עדכון** לכל מה שהוספנו מאז.
+
+### התקנה חלקית (רק ההגדרות/הוקים, בלי Claude/התוסף)
 ```powershell
 E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 ```
 זה: רושם `ccm` ל-`$PROFILE`, ממזג את הגדרות הטרמינל של VS Code (עם גיבוי), ומאמת הוקים.
+
+### ייצוא Markdown ל-PDF עם RTL
+פותחים קובץ `.md` ולוחצים על כפתור ה-PDF בסרגל-הכלים של הקובץ (פינה עליונה),
+או לחיצה-ימנית על הקובץ ב-Explorer → *ccm: Export Markdown to PDF (RTL)*.
+נוצר `<שם-הקובץ>.pdf` לצד ה-MD; עברית מזוהה אוטומטית ומיושרת ימין.
 
 ### הרצה
 1. לפתוח **חלון VS Code חדש** (חובה - כיבוי כותרת Claude נקרא בהפעלה).
@@ -134,6 +151,7 @@ node ccm-extension/test-extension.js
 
 ## היסטוריית שינויים
 
+| 2026-07-14 | **ייצוא Markdown→PDF עם RTL + מתקין-על נייד (`v18 md-rtl-pdf`):** שתי בקשות. (1) **הכאב האמיתי ב-RTL:** ה-Preview כבר מציג עברית נכון, אבל **אין ממנו אקספורט**, ולעורך-הקוד עצמו אין ב-VS Code שום API להפוך ל-RTL (בקשת-פיצ'ר פתוחה שנים) — כך שלמסמך עברי לא הייתה דרך ל-PDF מיושר-ימין. הפתרון: כפתור `$(file-pdf)` בסרגל-הכלים של כל קובץ Markdown (`when: resourceLangId == markdown`, וגם בתפריט הימני של הטאב וה-Explorer) → `md2pdf/render.js`: **marked מוטמע** (v12, MIT, קובץ יחיד — בלי npm, בלי רשת) הופך MD→HTML, ו-**Chrome/Edge headless** (`--print-to-pdf`) מדפיס. **למה לא Puppeteer** (מה שסקיל html-to-pdf עושה): הוא גורר ~300MB npm ו-Chromium שני; כאן מנצלים את ה-Edge שקיים בכל Windows. **כיווניות אוטומטית:** נוכחות עברית/ערבית → `dir=rtl`, אחרת LTR — כך "פשוט לייצא" עושה את הנכון לעברית ומשאיר אנגלית LTR. קוד ובלוקי-קוד מקובעים LTR. אומת חזותית: כותרות/תבליטים/ציטוט מתהפכים ימינה, קוד באנגלית נשאר LTR. (2) **מתקין-על `bootstrap.ps1`:** נקודת-כניסה אחת לכל מחשב — `git pull` (ולכן **הרצה חוזרת = עדכון** לכל מה שהוספנו), מתקין את **Claude עצמו** אם חסר (המתקין הרשמי, עצמאי), בודק Node/דפדפן, ואז מריץ את `install.ps1` ואת מתקין התוסף (שסוגר את הפער — עד עכשיו התוסף היה שלב ידני נפרד). נשמר תואם-PowerShell 5.1 (בלי ternary) כדי לרוץ על Win10 טרי. אומת: 73 בדיקות עוברות (11 חדשות, מול render מ-stubbed כדי לא לירות דפדפן אמיתי), ה-CLI ייצר PDF עברי תקין מ-README, ו-bootstrap רץ מקצה-לקצה באפס אזהרות. תוסף `0.0.10`. **דרוש `Reload Window`** |
 | 2026-07-13 | **שומר סגירת-חלון (`v17 window-close-guard`):** עד כה השומר הגן על טרמינל **בודד** (`confirmOnKill`), אבל לחיצה על ה-X של **החלון כולו** לקחה את כל הטרמינלים למטה בשקט. (1) **אין יירוט:** תוסף **לא יכול** ליירט את ה-X של החלון — אין אירוע סגירה שאפשר לבטל, בדיוק כמו ש-`onWillCloseTerminal` לא קיים. (2) **המנוף היחיד:** ההגדרה המובנית `terminal.integrated.confirmOnExit`, שברירת המחדל שלה `"never"`. פונקציה חדשה `ensureConfirmOnExit()` קובעת `"always"` — עכשיו ה-X שואל לפני שהוא סוגר כשיש טרמינלים חיים (הדיאלוג המובנה אף נוקב בספירה). (3) **אותה תבנית כמו `confirmOnKill`:** ממלאים רק מקום ריק — בחירה מפורשת של המשתמש לעולם לא נדרסת. הדיאלוג הוא של VS Code (אנגלית, Terminate/Cancel); המשתמש ויתר על טקסט מותאם, והמטרה — מניעת סגירה בטעות — מושגת במלואה. אומת: 62 בדיקות עוברות (2 חדשות). תוסף `0.0.9`. **דרוש `Reload Window`** |
 | תאריך | שינוי |
 |--------|-------|

@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-12 20:45 v15 keycode-dispatch`
+**Build:** `2026-07-14 22:55 v18 md-rtl-pdf`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -30,20 +30,35 @@ Running one standalone terminal per project means:
 | Can't tell which tab is focused | `terminal.tab.activeBorder` paints a bright border on it |
 | Typing a path to open a project | **`Alt+O`** — a floating picker of every project, most recently used first |
 | Closing a session by mistake | **`Alt+Q`** asks *backup / close / keep*, and the trash icon now confirms first |
+| Hebrew Markdown has no correct PDF | A **PDF button** on any `.md` toolbar exports it with RTL auto-detected |
 
 ## Quick start
+
+One command installs (or updates) everything on any machine — Claude Code itself,
+the VS Code settings/keybindings/hooks, and the extension:
+
+```powershell
+git clone https://github.com/idoyan-spec/claudeCodeManager.git
+cd claudeCodeManager
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+```
+
+`bootstrap.ps1` is idempotent: **run it again any time to update** to whatever was
+added since (it `git pull`s first, then re-installs). Then open a **new** VS Code
+window, press **`Alt+O`**, and pick a project.
+
+<details><summary>Manual, step by step (if you don't want the umbrella script)</summary>
 
 ```powershell
 # 1. Install (registers the `ccm` command + merges VS Code terminal settings, with backup)
 E:\MAIN_CLAUDE\claudeCodeManager\scripts\install.ps1
 
-# 2. Install the VS Code extension (gives you Alt+O and the right-click entry)
+# 2. Install the VS Code extension (Alt+O, close-guard, the RTL PDF button)
 powershell -ExecutionPolicy Bypass -File .\ccm-extension\install-extension.ps1
 
-# 3. Open a NEW VS Code window (required - the title control is read at startup)
-
-# 4. Press Alt+O and pick a project.  (Or type: ccm E:\path\to\some\project)
+# 3. Open a NEW VS Code window, then press Alt+O.  (Or: ccm E:\path\to\project)
 ```
+</details>
 
 Each project becomes a row in the vertical tab list, named by its folder, with a
 live status glyph.
@@ -89,6 +104,20 @@ session is killed anyway, you are offered it back: `claude --continue` reopens t
 conversation from Claude's own transcript. Turn all of this off with
 `ccmHub.guardTerminalClose: false`.
 
+## Export Markdown to PDF (with correct RTL)
+
+Open any `.md` file and click the **PDF** button on the editor toolbar (top-right),
+or right-click the file in the Explorer → *ccm: Export Markdown to PDF (RTL)*. A
+`<name>.pdf` is written next to it and offered to open.
+
+Why this exists: VS Code's Markdown **preview** shows Hebrew correctly but has **no
+export**, and the code **editor** has no RTL mode at all (a years-open VS Code
+feature request) — so a Hebrew document had no route to a right-aligned PDF. The
+export renders with a vendored [marked](https://marked.js.org) (no npm, no network)
+and prints with the **Edge/Chrome already on the machine** (`--print-to-pdf`), so
+there is no Puppeteer and no second Chromium. Direction is **auto-detected**:
+Hebrew/Arabic → RTL, otherwise LTR; code blocks stay LTR.
+
 - **New to VS Code? Start here (Hebrew):** [VSCODE_GUIDE.html](VSCODE_GUIDE.html) — screen map, terminal, shortcuts
 - **Full walk-through (Hebrew, non-technical):** [USER_GUIDE.html](USER_GUIDE.html) / [USER_GUIDE.md](USER_GUIDE.md)
 - **Developer summary (Hebrew):** [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
@@ -132,9 +161,11 @@ claudeCodeManager/
 │   ├── settings-snippet.json terminal settings to merge
 │   └── keybindings-snippet.json  terminal focus keys
 ├── ccm-extension/ccm-hub/
-│   ├── extension.js          URI handler + the Alt+O picker
-│   └── projects.js           the "most recently used" ranking (pure Node, testable)
+│   ├── extension.js          URI handler + Alt+O picker + the RTL PDF button
+│   ├── projects.js           the "most recently used" ranking (pure Node, testable)
+│   └── md2pdf/               MD→PDF (RTL): render.js + vendored marked.min.js
 ├── scripts/
+│   ├── bootstrap.ps1         one-command install/update for any machine
 │   ├── ccm.ps1               the launcher
 │   └── install.ps1           idempotent installer
 └── hooks/                    SOURCE of the hooks; install.ps1 deploys them

@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -25,6 +25,12 @@
       {
         "command": "ccmHub.copyTerminalSelection",
         "title": "ccm: Copy terminal selection (explain probe)"
+      },
+      {
+        "command": "ccmHub.exportMarkdownPdf",
+        "title": "ccm: Export Markdown to PDF (RTL)",
+        "category": "ccm",
+        "icon": "$(file-pdf)"
       }
     ],
     "keybindings": [
@@ -53,6 +59,27 @@
         {
           "command": "ccmHub.closeSession",
           "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ccmHub.exportMarkdownPdf",
+          "when": "resourceLangId == markdown",
+          "group": "navigation@9"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "ccmHub.exportMarkdownPdf",
+          "when": "resourceLangId == markdown",
+          "group": "1_ccm"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ccmHub.exportMarkdownPdf",
+          "when": "resourceLangId == markdown",
+          "group": "1_ccm"
         }
       ]
     },
