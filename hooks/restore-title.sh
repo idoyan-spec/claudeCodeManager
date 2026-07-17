@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-10 09:04 v14 close-guard
+# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
 #
 # Title format:  "<model square> <status> <folder>"   e.g.  "🟨 ⟳ claudeCodeManager"
 #
@@ -97,7 +97,7 @@ if [ "$state" = "done" ] || [ -z "$(ccm_model_glyph "$session_id")" ]; then
   ccm_refresh_model_glyph "$session_id" "$transcript" || true
 fi
 
-dirname=$(basename "$(pwd)")
+dirname=$(ccm_folder_label "$session_id")
 title=$(ccm_title "$glyph" "$session_id" "$dirname")
 
 # Debug log.

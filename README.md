@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-14 22:55 v18 md-rtl-pdf`
+**Build:** `2026-07-17 14:05 v20 window-confirm-close`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -30,6 +30,7 @@ Running one standalone terminal per project means:
 | Can't tell which tab is focused | `terminal.tab.activeBorder` paints a bright border on it |
 | Typing a path to open a project | **`Alt+O`** — a floating picker of every project, most recently used first |
 | Closing a session by mistake | **`Alt+Q`** asks *backup / close / keep*, and the trash icon now confirms first |
+| Closing the whole window by mistake | `window.confirmBeforeClose: always` — VS Code asks before **any** window close, the mouse X included |
 | Hebrew Markdown has no correct PDF | A **PDF button** on any `.md` toolbar exports it with RTL auto-detected |
 
 ## Quick start
@@ -104,6 +105,17 @@ session is killed anyway, you are offered it back: `claude --continue` reopens t
 conversation from Claude's own transcript. Turn all of this off with
 `ccmHub.guardTerminalClose: false`.
 
+**Closing the whole window** has two layers. `terminal.integrated.confirmOnExit`
+(set to `always`) makes VS Code's own X ask before it takes live *terminals*
+down — but it stays silent when the window has none. So the extension also sets
+**`window.confirmBeforeClose: "always"`**, VS Code's true "ask before every
+close": verified in the desktop bundle to fire on *any* close, the mouse X
+included (not only keyboard shortcuts, which is what its `keyboardOnly` value
+limits it to). Its dialog has a *"do not ask again"* checkbox — tick it and the
+setting flips to `never`, which the extension then respects (it only ever fills
+an empty setting, never overrides your choice). Same `ccmHub.guardTerminalClose:
+false` opts out of all of it.
+
 ## Export Markdown to PDF (with correct RTL)
 
 Open any `.md` file and click the **PDF** button on the editor toolbar (top-right),
@@ -126,6 +138,13 @@ Hebrew/Arabic → RTL, otherwise LTR; code blocks stay LTR.
 ## The tab title: `<model> <status> <folder>`
 
 Example: `🟨 ⟳ claudeCodeManager` — an Opus session that is working.
+
+The `<folder>` is the project the session was **launched** in, not wherever it
+happens to be right now. A session that `cd`s into a subfolder (say a website
+stepping into `public/`) used to silently rename its tab `public`, losing which
+project it even was. Now the project name is fixed at SessionStart and the
+current subfolder is shown after a dash, like a breadcrumb:
+`🟨 ⟳ mysite - public`. Back at the root it collapses to just `🟨 ⟳ mysite`.
 
 | Glyph | Meaning | Hook that sets it |
 |-------|---------|-------------------|

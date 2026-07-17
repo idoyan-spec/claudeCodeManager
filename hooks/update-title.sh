@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook script.
-# BUILD: 2026-07-10 09:04 v14 close-guard
+# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
 #
 # Reads JSON from stdin ({ session_id, transcript_path, cwd, prompt, ... }) and
 # sets the tab title to "<model square> <status> <folder>". The user just
@@ -26,7 +26,7 @@ if [ -z "$(ccm_model_glyph "$session_id")" ]; then
   ccm_refresh_model_glyph "$session_id" "$(ccm_transcript_path "$INPUT")" || true
 fi
 
-dirname=$(basename "$(pwd)")
+dirname=$(ccm_folder_label "$session_id")
 title=$(ccm_title "⟳" "$session_id" "$dirname")
 
 # Cache the computed title so the Stop hook can re-apply it after Claude Code

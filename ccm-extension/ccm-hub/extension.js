@@ -41,7 +41,7 @@ const { exportMarkdownToPdf } = require('./md2pdf/render');
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-14 22:40 v18 md-rtl-pdf';
+const BUILD = '2026-07-17 14:05 v20 window-confirm-close';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
@@ -423,6 +423,27 @@ async function ensureConfirmOnExit() {
   }
 }
 
+// `confirmOnExit` still only fires when the window has LIVE TERMINALS. Close a
+// window that has none — or any VS Code window at all — and it exits with no
+// question. The lever that asks before EVERY window close, terminals or not, is
+// `window.confirmBeforeClose`. Verified in the 1.10x desktop bundle: the shutdown
+// path reads it and, on "always", calls preventUnload for every close INCLUDING
+// the mouse X (not just the keyboard — that is what the "keyboardOnly" value
+// narrows it to). Its native dialog carries a "do not ask again" checkbox that
+// flips the value to "never"; we then respect that, because — like the two guards
+// above — we only ever fill an empty slot and never overwrite the user's choice.
+async function ensureConfirmBeforeClose() {
+  if (!cfg().get('guardTerminalClose', true)) return;
+  const conf = vscode.workspace.getConfiguration('window');
+  const info = conf.inspect('confirmBeforeClose');
+  if (info && info.globalValue !== undefined) return;
+  try {
+    await conf.update('confirmBeforeClose', 'always', vscode.ConfigurationTarget.Global);
+  } catch {
+    /* read-only settings.json — the window X will still exit without asking */
+  }
+}
+
 // VS Code stores the panel position PER WORKSPACE, as the numeric
 // `workbench.panel.position` in that workspace's state.vscdb
 // (0=left, 1=right, 2=bottom, 3=top — from the bundle's positionToString).
@@ -682,6 +703,7 @@ function activate(context) {
   ensureSkipShell();
   ensureConfirmOnKill();
   ensureConfirmOnExit();
+  ensureConfirmBeforeClose();
 
   // A terminal the user killed is not a session any more — but it is still
   // recoverable, so offer that before forgetting it.

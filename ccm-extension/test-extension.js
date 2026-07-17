@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-14 22:40 v18 md-rtl-pdf
+// test-extension.js  |  BUILD: 2026-07-17 14:05 v20 window-confirm-close
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -42,7 +42,7 @@ let lastWarningItems = null;
 let lastWarningMessage = null;
 let cancelProgressAfterMs = null;
 let lastWebview = null;
-const settingsStore = { 'terminal.integrated': { commandsToSkipShell: ['existing.user.command'] } };
+const settingsStore = { 'terminal.integrated': { commandsToSkipShell: ['existing.user.command'] }, window: {} };
 const ccmSettings = { projectsRoot: ROOT, claudeCommand: 'claude --dangerously-skip-permissions' };
 
 function makeTerminal(opts) {
@@ -243,6 +243,8 @@ async function openVia(folder) {
     settingsStore['terminal.integrated'].confirmOnKill === 'always');
   assert('turns confirmOnExit on (window-close X defaults to "never" and kills every terminal silently)',
     settingsStore['terminal.integrated'].confirmOnExit === 'always');
+  assert('turns window.confirmBeforeClose on (asks before ANY window close, even with no terminals)',
+    settingsStore.window.confirmBeforeClose === 'always');
 
   log.length = 0;
   ext.activate(context);
@@ -265,11 +267,22 @@ async function openVia(folder) {
     settingsStore['terminal.integrated'].confirmOnExit === 'never' &&
     !log.some((l) => l.startsWith('settings.update:confirmOnExit')));
 
+  // A user who ticks "do not ask again" in the dialog sets this to "never"; the
+  // guard must then leave it alone, exactly like the two terminal guards above.
+  settingsStore.window.confirmBeforeClose = 'never';
+  log.length = 0;
+  ext.activate(context);
+  await tick();
+  assert("an explicit window.confirmBeforeClose of the user's is never overwritten",
+    settingsStore.window.confirmBeforeClose === 'never' &&
+    !log.some((l) => l.startsWith('settings.update:confirmBeforeClose')));
+  settingsStore.window.confirmBeforeClose = undefined; // reset for any later runs
+
   console.log('\npicker');
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v18 md-rtl-pdf')));
+  assert('title carries the build stamp', log.some((l) => l.includes('v20 window-confirm-close')));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 

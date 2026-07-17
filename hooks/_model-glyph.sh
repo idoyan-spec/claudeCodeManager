@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared helper: build the tab title "<model> <status> <folder>".
-# BUILD: 2026-07-10 09:04 v14 close-guard
+# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
 #
 # Why the model lives in the TITLE and not in the tab colour:
 #   VS Code freezes a terminal's icon and colour at creation time -
@@ -96,6 +96,42 @@ ccm_refresh_model_glyph() {
 ccm_model_glyph() {
   local f="$CCM_MODEL_DIR/${1:-default}.txt"
   [ -f "$f" ] && cat "$f"
+}
+
+# --- folder label: project root, plus a breadcrumb when cd'd into a subfolder ---
+#
+# The tab names a PROJECT, so its label must stay the folder the session was
+# launched in - not wherever Claude has since `cd`'d. A website session that
+# steps into `public/` used to silently rename its tab "public", losing which
+# project it even was. So we remember the launch (root) folder at SessionStart
+# and, when the current folder differs, show it after a dash like a breadcrumb:
+#   "קליקיט"            at the root
+#   "קליקיט - public"   while working inside public/
+CCM_ROOT_DIR="$HOME/.claude/skills/session-behavior/session-roots"
+
+# ccm_record_root <session_id>  ->  remember pwd as this session's project root.
+# Call ONLY from SessionStart, where pwd is guaranteed to be the launch folder.
+ccm_record_root() {
+  local sid="${1:-default}"
+  mkdir -p "$CCM_ROOT_DIR" 2>/dev/null
+  printf '%s' "$(pwd)" > "$CCM_ROOT_DIR/$sid.txt"
+}
+
+# ccm_folder_label <session_id>  ->  "<root>" or "<root> - <current-subfolder>"
+# Falls back to plain basename when no root was recorded (e.g. a session that
+# started before this feature, or an unknown session id).
+ccm_folder_label() {
+  local sid="${1:-default}" root cur rootbase
+  cur=$(pwd)
+  root=""
+  [ -f "$CCM_ROOT_DIR/$sid.txt" ] && root=$(cat "$CCM_ROOT_DIR/$sid.txt" 2>/dev/null)
+  if [ -z "$root" ]; then
+    printf '%s' "$(basename "$cur")"
+  elif [ "$cur" = "$root" ]; then
+    printf '%s' "$(basename "$root")"
+  else
+    printf '%s - %s' "$(basename "$root")" "$(basename "$cur")"
+  fi
 }
 
 # ccm_title <status_glyph> <session_id> <folder>

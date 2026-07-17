@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-10 09:04 v14 close-guard
+# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)
@@ -11,8 +11,6 @@
 # A fresh session is idle and waiting for you to type - the same state the Stop
 # hook reports - so SessionStart paints "✓", not a blank status. Leaving it
 # blank made every tab in a reopened window look unarmed until its first prompt.
-
-dirname=$(basename "$(pwd)")
 
 session_id=""
 if [ "$1" = "--session" ]; then
@@ -35,6 +33,15 @@ if [ -z "$session_id" ]; then
   session_id="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
 fi
 [ -n "$session_id" ] || session_id="default"
+
+# SessionStart runs here (no topic) with pwd = the project's launch folder, so
+# this is the one moment we can anchor the tab's name to the project root. Later
+# hooks read it and append a "- subfolder" breadcrumb when Claude cd's away.
+if [ -z "$topic" ]; then
+  ccm_record_root "$session_id"
+fi
+
+dirname=$(ccm_folder_label "$session_id")
 
 # Persist topic for this session so the UserPromptSubmit hook keeps using it.
 if [ -n "$topic" ]; then
