@@ -1,4 +1,4 @@
-// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-10 09:04 v14 close-guard).
+// Claude Code Manager - terminal focus keybindings (BUILD 2026-07-19 02:32 v21 shift-enter-newline).
 // Merge into your VS Code keybindings.json. install.ps1 does it for you (with a backup).
 //
 // Goal: the caret should land on the prompt line of the session you moved to,
@@ -49,6 +49,17 @@
     "key": "alt+up",
     "command": "workbench.action.terminal.focusPrevious",
     "when": "terminalFocus && !terminalTabsFocus"
+  },
+  {
+    // Shift+Enter = newline inside Claude Code instead of submitting. This is the
+    // exact binding Claude Code's own /terminal-setup writes: ESC+CR ("\u001b\r"),
+    // which the TUI decodes as "insert line break". NOT backslash+Enter - that
+    // older workaround leaves a visible "\" artifact. Scoped to terminalFocus;
+    // in a plain shell prompt it just sends ESC then Enter (harmless).
+    "key": "shift+enter",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": { "text": "\u001b\r" },
+    "when": "terminalFocus"
   },
   {
     "key": "down",
