@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-12 20:45 v15 keycode-dispatch
+// ccm-hub  |  BUILD: 2026-07-19 04:20 v22 night-autonomy
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI or by the Alt+O project picker. No SendKeys, no
 // focus games — the Terminal API.
@@ -31,7 +31,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-const { rankedProjects, ago } = require('./projects');
+const { rankedProjects, ago, openTaskCount } = require('./projects');
 // MD -> PDF with correct RTL. A buildless module that renders the Markdown with a
 // vendored marked and prints it with the Edge/Chrome already on the machine, so
 // there is no npm dependency and no bundled Chromium. See md2pdf/render.js.
@@ -41,7 +41,7 @@ const { exportMarkdownToPdf } = require('./md2pdf/render');
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
 // Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-17 14:05 v20 window-confirm-close';
+const BUILD = '2026-07-19 04:20 v22 night-autonomy';
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
@@ -152,11 +152,19 @@ async function openProjectPicker(context) {
   // A single clock reading, so two rows a millisecond apart cannot read "1m ago"
   // and "0m ago" for the same instant.
   const now = Date.now();
-  const items = projects.map((p) => ({
-    label: `$(folder) ${p.name}`,
-    description: sessions.has(p.fsPath) ? `$(circle-filled) running` : ago(p.stamp, now),
-    fsPath: p.fsPath
-  }));
+  // Each row also shows how many open items sit in that project's tasks file
+  // (<folder>-TASKS.md, the /88 convention) — the picker doubles as a "what is
+  // waiting where" board. Nothing is shown when the count is 0 or there is no
+  // tasks file: an all-clear row should look clean, not carry a "0".
+  const items = projects.map((p) => {
+    const open = openTaskCount(p.fsPath);
+    const state = sessions.has(p.fsPath) ? `$(circle-filled) running` : ago(p.stamp, now);
+    return {
+      label: `$(folder) ${p.name}`,
+      description: open ? `${state} · $(checklist) ${open}` : state,
+      fsPath: p.fsPath
+    };
+  });
 
   const chosen = await vscode.window.showQuickPick(items, {
     title: `Claude Code — open project  ·  ccm ${BUILD}`,
@@ -411,12 +419,29 @@ async function ensureConfirmOnKill() {
 // An extension cannot intercept the window X itself — there is no cancellable
 // close event — so this built-in setting is the only lever. Fill it only when
 // the user has no opinion of their own, exactly like confirmOnKill above.
+//
+// DEDUP (v22): v17 filled this and v20 added `window.confirmBeforeClose` — and
+// with both on "always", one click on the X asked TWICE in a row about the same
+// close. confirmBeforeClose strictly covers this setting's case (it fires on
+// every window close, terminals or not), so while the window guard is "always"
+// this one is redundant: skip filling it, and clear a leftover "always" — that
+// exact value is the only one our own fill ever wrote. Any other value ("never",
+// a workspace override) is a human's decision and is left alone. Must run AFTER
+// ensureConfirmBeforeClose, or on first install it would still fill both.
 async function ensureConfirmOnExit() {
   if (!cfg().get('guardTerminalClose', true)) return;
+  const win = vscode.workspace.getConfiguration('window').inspect('confirmBeforeClose');
+  const windowGuard = win && win.globalValue === 'always';
   const conf = vscode.workspace.getConfiguration('terminal.integrated');
   const info = conf.inspect('confirmOnExit');
-  if (info && info.globalValue !== undefined) return;
   try {
+    if (windowGuard) {
+      if (info && info.globalValue === 'always') {
+        await conf.update('confirmOnExit', undefined, vscode.ConfigurationTarget.Global);
+      }
+      return;
+    }
+    if (info && info.globalValue !== undefined) return;
     await conf.update('confirmOnExit', 'always', vscode.ConfigurationTarget.Global);
   } catch {
     /* read-only settings.json — nothing else covers the window-close X */
@@ -441,6 +466,27 @@ async function ensureConfirmBeforeClose() {
     await conf.update('confirmBeforeClose', 'always', vscode.ConfigurationTarget.Global);
   } catch {
     /* read-only settings.json — the window X will still exit without asking */
+  }
+}
+
+// Concurrent editing is a designed workflow here: the user keeps typing in the
+// project's -TASKS.md while Claude works on other files, or the same one.
+// Claude's Edit tool refuses to write over changes it has not seen — but only
+// changes that reached DISK count. A dirty buffer the user keeps open for an
+// hour is invisible to it, and the eventual Ctrl+S is the one moment a real
+// conflict (the Overwrite dialog) can appear. `afterDelay` (1s default) keeps
+// the buffer flowing to disk continuously, shrinking that window to nothing.
+// Fill-only, like every guard above: an explicit files.autoSave of ANY value —
+// including "off" — is the user's opinion and is never touched.
+async function ensureAutoSave() {
+  if (!cfg().get('ensureAutoSave', true)) return;
+  const conf = vscode.workspace.getConfiguration('files');
+  const info = conf.inspect('autoSave');
+  if (info && info.globalValue !== undefined) return;
+  try {
+    await conf.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Global);
+  } catch {
+    /* read-only settings.json — manual Ctrl+S still works */
   }
 }
 
@@ -702,8 +748,10 @@ function activate(context) {
 
   ensureSkipShell();
   ensureConfirmOnKill();
-  ensureConfirmOnExit();
-  ensureConfirmBeforeClose();
+  ensureAutoSave();
+  // Ordered on purpose: ensureConfirmOnExit reads the window guard's value to
+  // decide fill-vs-dedup, so the window guard must be settled first.
+  ensureConfirmBeforeClose().then(() => ensureConfirmOnExit());
 
   // A terminal the user killed is not a session any more — but it is still
   // recoverable, so offer that before forgetting it.

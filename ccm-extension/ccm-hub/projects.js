@@ -1,4 +1,4 @@
-// ccm-hub / projects.js  |  BUILD: 2026-07-10 09:04 v14 close-guard
+// ccm-hub / projects.js  |  BUILD: 2026-07-19 04:20 v22 night-autonomy
 //
 // The recency model behind the project picker.
 //
@@ -93,6 +93,42 @@ function rankedProjects(root, mru) {
     );
 }
 
+// How many OPEN items sit in the project's tasks file — <folder>-TASKS.md (the
+// /88 convention), falling back to a legacy TASKS.md. An "item" line starts
+// with an enumerator (1. / 2) / א. / a)) or a "- " bullet; a ✓ at the start of
+// the line (or right after the enumerator) marks it done.
+//
+// Calibrated against a real hand-written file, not the ideal format: the user
+// types "1.משימה" with no space and "3 להריץ" with no dot, so the punctuation
+// and the space are both optional on numbers. And per the file's own header,
+// INDENTED lines are context notes of the item above them — an indent, not a
+// bullet glyph, is what separates "another task" from "a note", so any line
+// that starts with whitespace is skipped outright.
+//
+// Returns 0 both for "no tasks file" and "all done" — deliberately the same:
+// either way nothing is waiting there, and the picker row stays clean.
+function openTaskCount(fsPath) {
+  const name = path.basename(fsPath);
+  for (const f of [`${name}-TASKS.md`, 'TASKS.md']) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(fsPath, f), 'utf8');
+    } catch {
+      continue; // this candidate does not exist — try the next
+    }
+    let open = 0;
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s/.test(line)) continue; // indented = a note under the item above
+      const t = line.trim();
+      if (!t || t.startsWith('#') || t.startsWith('>') || t.startsWith('✓')) continue;
+      const m = t.match(/^(?:\d+[.)]?|[-*•]\s|[A-Za-zא-ת][.)])\s*(.+)$/);
+      if (m && !m[1].startsWith('✓')) open += 1;
+    }
+    return open;
+  }
+  return 0;
+}
+
 function ago(ms, now) {
   if (!ms) return 'never opened';
   const sec = Math.max(0, (now - ms) / 1000);
@@ -107,4 +143,4 @@ function ago(ms, now) {
   return `${Math.floor(day / 30)}mo ago`;
 }
 
-module.exports = { encodeProjectDir, historyStamp, listProjectFolders, rankedProjects, ago };
+module.exports = { encodeProjectDir, historyStamp, listProjectFolders, rankedProjects, ago, openTaskCount };

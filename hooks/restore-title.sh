@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-apply the tab title after Claude Code renders.
-# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
+# BUILD: 2026-07-19 04:20 v22 night-autonomy
 #
 # Title format:  "<model square> <status> <folder>"   e.g.  "🟨 ⟳ claudeCodeManager"
 #
@@ -8,6 +8,7 @@
 #   working    -> "⟳"   Claude is busy (PostToolUse)
 #   done       -> "✓"   Claude finished, your turn (Stop)
 #   attention  -> "‼"   Claude needs you now (Notification / permission)
+#   compact    -> "⟳"   a context compaction just started (PreCompact)
 #
 # Legacy: "--force" is accepted and treated as "done".
 #
@@ -64,6 +65,7 @@ fi
 
 case "$state" in
   working)   glyph="⟳" ;;
+  compact)   glyph="⟳" ;;
   attention) glyph="‼" ;;
   *)         glyph="✓" ;;
 esac
@@ -71,6 +73,17 @@ esac
 session_id=$(ccm_json_str "$INPUT" session_id)
 [ -n "$session_id" ] || session_id="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
 [ -n "$session_id" ] || session_id="default"
+
+# PreCompact: remember WHY this compaction started. When it ends, SessionStart
+# fires with source=compact but carries no trigger field of its own — so this
+# marker is how set-title.sh knows whether to paint ✓ (manual /compact, the user
+# is at the keyboard) or keep ⟳ (auto-compact mid-task, Claude is still working).
+if [ "$state" = "compact" ]; then
+  TRIG_DIR="$HOME/.claude/skills/session-behavior/compact-trigger"
+  mkdir -p "$TRIG_DIR" 2>/dev/null
+  trigger=$(ccm_json_str "$INPUT" trigger)
+  printf '%s' "${trigger:-manual}" > "$TRIG_DIR/$session_id.txt"
+fi
 
 LAST_TITLE_DIR="$HOME/.claude/skills/session-behavior/last-titles"
 

@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -99,7 +99,12 @@
         "ccmHub.guardTerminalClose": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (one terminal) and `#terminal.integrated.confirmOnExit#` to `always` (the whole window's X) — each only if you have not set it yourself — and offers to restore a Claude session you killed. `Alt+Q` asks *backup / close / keep* regardless of this setting."
+          "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (one terminal) and `#window.confirmBeforeClose#` to `always` (the whole window's X) — each only if you have not set it yourself — and offers to restore a Claude session you killed. While the window guard is `always`, a redundant `#terminal.integrated.confirmOnExit#: always` is removed so one close asks one question, not two. `Alt+Q` asks *backup / close / keep* regardless of this setting."
+        },
+        "ccmHub.ensureAutoSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Fill `#files.autoSave#` with `afterDelay` when you have no value of your own, so edits you type while Claude is working (e.g. in the project's `-TASKS.md`) reach the disk continuously and can never collide with Claude's writes in an Overwrite dialog. Set your own `files.autoSave` (any value, including `off`) and this never touches it."
         }
       }
     }

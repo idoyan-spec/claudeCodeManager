@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-17 14:05 v20 window-confirm-close
+// test-extension.js  |  BUILD: 2026-07-19 04:20 v22 night-autonomy
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -42,7 +42,7 @@ let lastWarningItems = null;
 let lastWarningMessage = null;
 let cancelProgressAfterMs = null;
 let lastWebview = null;
-const settingsStore = { 'terminal.integrated': { commandsToSkipShell: ['existing.user.command'] }, window: {} };
+const settingsStore = { 'terminal.integrated': { commandsToSkipShell: ['existing.user.command'] }, window: {}, files: {} };
 const ccmSettings = { projectsRoot: ROOT, claudeCommand: 'claude --dangerously-skip-permissions' };
 
 function makeTerminal(opts) {
@@ -241,10 +241,12 @@ async function openVia(folder) {
     upd.includes('ccmHub.copyTerminalSelection'), upd);
   assert('turns confirmOnKill on (VS Code defaults to "editor", which skips panel terminals)',
     settingsStore['terminal.integrated'].confirmOnKill === 'always');
-  assert('turns confirmOnExit on (window-close X defaults to "never" and kills every terminal silently)',
-    settingsStore['terminal.integrated'].confirmOnExit === 'always');
   assert('turns window.confirmBeforeClose on (asks before ANY window close, even with no terminals)',
     settingsStore.window.confirmBeforeClose === 'always');
+  assert('confirmOnExit is NOT also filled — one close must ask ONE question, not two',
+    settingsStore['terminal.integrated'].confirmOnExit === undefined);
+  assert('autoSave filled with afterDelay (user edits while Claude works reach disk continuously)',
+    settingsStore.files.autoSave === 'afterDelay');
 
   log.length = 0;
   ext.activate(context);
@@ -278,11 +280,42 @@ async function openVia(folder) {
     !log.some((l) => l.startsWith('settings.update:confirmBeforeClose')));
   settingsStore.window.confirmBeforeClose = undefined; // reset for any later runs
 
+  // The v17→v20 leftover: a machine where BOTH guards ended up "always" asked
+  // twice per close. With the window guard active, the redundant terminal-level
+  // "always" — the exact value our own fill wrote — is cleared.
+  settingsStore.window.confirmBeforeClose = 'always';
+  settingsStore['terminal.integrated'].confirmOnExit = 'always';
+  log.length = 0;
+  ext.activate(context);
+  await tick();
+  assert('a leftover confirmOnExit "always" is removed while the window guard is on',
+    settingsStore['terminal.integrated'].confirmOnExit === undefined);
+
+  // But when the user opted OUT of the window guard, confirmOnExit is still the
+  // only thing standing between the X and dead terminals — the fill returns.
+  settingsStore.window.confirmBeforeClose = 'never';
+  delete settingsStore['terminal.integrated'].confirmOnExit;
+  log.length = 0;
+  ext.activate(context);
+  await tick();
+  assert('with the window guard off, confirmOnExit is filled again',
+    settingsStore['terminal.integrated'].confirmOnExit === 'always');
+  settingsStore.window.confirmBeforeClose = undefined;
+
+  // An explicit files.autoSave — even "off" — is the user's and stays.
+  settingsStore.files.autoSave = 'off';
+  log.length = 0;
+  ext.activate(context);
+  await tick();
+  assert("an explicit files.autoSave of the user's is never overwritten",
+    settingsStore.files.autoSave === 'off' &&
+    !log.some((l) => l.startsWith('settings.update:autoSave')));
+
   console.log('\npicker');
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v20 window-confirm-close')));
+  assert('title carries the build stamp', log.some((l) => l.includes('v22 night-autonomy')));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Set terminal window title.
-# BUILD: 2026-07-15 13:38 v19 title-breadcrumb
+# BUILD: 2026-07-19 04:20 v22 night-autonomy
 #
 # Usage:
 #   set-title.sh                        -> "<model> ✓ <dirname>"  (SessionStart hook)
@@ -34,10 +34,16 @@ if [ -z "$session_id" ]; then
 fi
 [ -n "$session_id" ] || session_id="default"
 
+# SessionStart also fires when a context compaction ENDS (source=compact), and
+# then pwd is wherever Claude happened to cd — mid-task, possibly a subfolder.
+# Everything below that assumes "a session is starting" must skip that case.
+src=$(ccm_json_str "$INPUT" source)
+
 # SessionStart runs here (no topic) with pwd = the project's launch folder, so
 # this is the one moment we can anchor the tab's name to the project root. Later
 # hooks read it and append a "- subfolder" breadcrumb when Claude cd's away.
-if [ -z "$topic" ]; then
+# NOT on compact: re-anchoring there would rename the whole tab to the subfolder.
+if [ -z "$topic" ] && [ "$src" != "compact" ]; then
   ccm_record_root "$session_id"
 fi
 
@@ -56,7 +62,20 @@ else
   # A resumed session already has assistant turns, so the transcript names the
   # model. A fresh one falls back to the configured model inside this helper.
   ccm_refresh_model_glyph "$session_id" "$(ccm_transcript_path "$INPUT")" || true
-  title=$(ccm_title "✓" "$session_id" "$dirname")
+
+  # A fresh/resumed session is idle — ✓. But after a compaction it depends on
+  # what STARTED it: a manual /compact means the user is at the keyboard (✓),
+  # while an AUTO compact happens mid-task and Claude keeps working (⟳).
+  # Painting ✓ unconditionally here was the "false done during COMPACT" bug —
+  # the tab said "your turn" for the rest of a long overnight run. The
+  # PreCompact hook recorded the trigger; consume its marker and paint right.
+  status="✓"
+  if [ "$src" = "compact" ]; then
+    TRIG_FILE="$HOME/.claude/skills/session-behavior/compact-trigger/$session_id.txt"
+    if [ "$(cat "$TRIG_FILE" 2>/dev/null)" = "auto" ]; then status="⟳"; fi
+    rm -f "$TRIG_FILE" 2>/dev/null
+  fi
+  title=$(ccm_title "$status" "$session_id" "$dirname")
 fi
 
 # Debug log so we can confirm the hook fired.

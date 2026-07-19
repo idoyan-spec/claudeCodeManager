@@ -9,12 +9,12 @@
 
   Nothing here runs in the background, opens a port, or phones home.
 
-  BUILD: 2026-07-12 20:45 v15 keycode-dispatch
+  BUILD: 2026-07-19 04:20 v22 night-autonomy
 #>
 [CmdletBinding()]
 param()
 
-$BUILD = '2026-07-12 20:45 v15 keycode-dispatch'
+$BUILD = '2026-07-19 04:20 v22 night-autonomy'
 $root  = Split-Path -Parent $PSScriptRoot
 $ccm   = Join-Path $PSScriptRoot 'ccm.ps1'
 
@@ -161,6 +161,10 @@ $wantHooks = @(
     @{ Event = 'Stop';             Cmd = ($hookCmd -f 'restore-title.sh') + ' done';      Sig = 'restore-title.sh" done' }
     @{ Event = 'PostToolUse';      Cmd = ($hookCmd -f 'restore-title.sh') + ' working';   Sig = 'restore-title.sh" working' }
     @{ Event = 'Notification';     Cmd = ($hookCmd -f 'restore-title.sh') + ' attention'; Sig = 'restore-title.sh" attention' }
+    # Compaction bookend. PreCompact records the trigger (manual/auto) and paints ⟳;
+    # set-title.sh consumes the marker on SessionStart(source=compact) so an AUTO
+    # compact mid-task keeps showing ⟳ instead of a false "your turn" ✓.
+    @{ Event = 'PreCompact';       Cmd = ($hookCmd -f 'restore-title.sh') + ' compact';   Sig = 'restore-title.sh" compact' }
     # Audible alert alongside the red tab flash. The Windows directory is resolved by
     # .NET, not hardcoded to C:\Windows - and deliberately WITHOUT a `$` anywhere:
     # hook commands are handed to a shell that expands `$` (that is how `$HOME` above
@@ -271,6 +275,12 @@ $wantKb = @(
                        args = [pscustomobject]@{ commands = @('list.focusDown','list.select','workbench.action.terminal.focus') } }
     [pscustomobject]@{ key = 'up';   command = 'runCommands'; when = 'terminalTabsFocus'
                        args = [pscustomobject]@{ commands = @('list.focusUp','list.select','workbench.action.terminal.focus') } }
+    # Shift+Enter = newline inside Claude Code instead of submitting — the exact
+    # ESC+CR binding Claude's own /terminal-setup writes. The chars are built with
+    # [char] on purpose: ConvertTo-Json re-escapes them into proper JSON escape sequences in the file,
+    # and no literal escape sequence in THIS script can get mangled on the way.
+    [pscustomobject]@{ key = 'shift+enter'; command = 'workbench.action.terminal.sendSequence'; when = 'terminalFocus'
+                       args = [pscustomobject]@{ text = ([char]27 + [char]13) } }
 )
 
 if (-not (Test-Path $kbPath)) {
