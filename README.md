@@ -32,6 +32,7 @@ Running one standalone terminal per project means:
 | Closing a session by mistake | **`Alt+Q`** asks *backup / close / keep*, and the trash icon now confirms first |
 | Closing the whole window by mistake | `window.confirmBeforeClose: always` — VS Code asks before **any** window close, the mouse X included |
 | Hebrew Markdown has no correct PDF | A **PDF button** on any `.md` toolbar exports it with RTL auto-detected |
+| Reaching a folder means leaving the keyboard | **`Alt+E`** — a floating two-pane browser (tree ⟷ contents), all-keyboard, that runs a file with `F5` and drops a **Claude / Codex / Gemini / Copilot** terminal into any folder from its context menu |
 
 ## Quick start
 
@@ -181,7 +182,11 @@ claudeCodeManager/
 │   └── keybindings-snippet.json  terminal focus keys
 ├── ccm-extension/ccm-hub/
 │   ├── extension.js          URI handler + Alt+O picker + the RTL PDF button
+│   ├── build.js              the single source of truth for the build stamp
 │   ├── projects.js           the "most recently used" ranking (pure Node, testable)
+│   ├── browser/              the Alt+E file browser: index.js (host) + agents.js
+│   │                         (agent registry & PATH probe) + fsops.js (disk, pure
+│   │                         Node) + webview.{html,css,js} (panes, keys, menu)
 │   └── md2pdf/               MD→PDF (RTL): render.js + vendored marked.min.js
 ├── scripts/
 │   ├── bootstrap.ps1         one-command install/update for any machine

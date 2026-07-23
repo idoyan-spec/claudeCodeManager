@@ -36,12 +36,17 @@ const { rankedProjects, ago, openTaskCount } = require('./projects');
 // vendored marked and prints it with the Edge/Chrome already on the machine, so
 // there is no npm dependency and no bundled Chromium. See md2pdf/render.js.
 const { exportMarkdownToPdf } = require('./md2pdf/render');
+// Alt+E: a two-pane file browser (tree left, contents right) that floats over
+// the editor, is driven entirely from the keyboard, and can drop a terminal for
+// any installed coding agent into any folder. See browser/index.js.
+const { openFileBrowser } = require('./browser');
 
 // A static icon so a Claude session is distinguishable from a plain shell tab.
 const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 
-// Shown in the picker's title bar, so a glance confirms which build is running.
-const BUILD = '2026-07-19 04:20 v22 night-autonomy';
+// Shown in the picker's title bar and the browser's footer, so a glance confirms
+// which build is running. One constant, in build.js, for every surface.
+const { BUILD } = require('./build');
 
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
@@ -52,7 +57,11 @@ const PROBE_COMMAND = 'ccmHub.copyTerminalSelection';
 // Export the active Markdown file to a PDF beside it, with RTL auto-detected from
 // the content. Contributed as an editor-title button that only shows for Markdown.
 const EXPORT_PDF_COMMAND = 'ccmHub.exportMarkdownPdf';
-const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND];
+// Alt+E. Like Alt+O and Alt+Q it must be pressable from inside a terminal, so it
+// joins the skip-shell list below — otherwise PowerShell eats the keystroke and
+// the browser never opens.
+const BROWSER_COMMAND = 'ccmHub.openFileBrowser';
+const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND, BROWSER_COMMAND];
 const MRU_KEY = 'ccmHub.mru';
 
 // The status glyphs the ccm hooks write into the tab title, from
@@ -796,6 +805,18 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(EXPORT_PDF_COMMAND, (arg) => exportMarkdownPdf(arg))
+  );
+
+  // The browser is handed the two things it must not reimplement: how this
+  // extension opens a Claude session (so the close guard and the restore offer
+  // keep working for terminals it starts) and how it exports a Markdown file.
+  context.subscriptions.push(
+    vscode.commands.registerCommand(BROWSER_COMMAND, () =>
+      openFileBrowser(context, {
+        openClaudeSession: (folder) => openSession(folder),
+        exportMarkdownPdf: (uri) => exportMarkdownPdf(uri)
+      })
+    )
   );
 
   context.subscriptions.push(

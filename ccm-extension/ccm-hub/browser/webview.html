@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--
+  ccm-hub / browser/webview.html
+  The Alt+E file browser's markup. index.js swaps the two placeholder tokens in
+  the style and script tags below for the contents of webview.css / webview.js at
+  panel-creation time, so those two files stay real .css/.js on disk
+  (highlightable, lintable, no escaping games) instead of being buried in a
+  template literal.
+
+  Do NOT write either placeholder token anywhere else in this file, including in
+  a comment: the swap replaces the FIRST occurrence, so a second mention silently
+  eats the substitution and ships a page with no styles or no script.
+
+  Layout is LTR on purpose — tree on the left, contents on the right, the way
+  Explorer puts them and the way the user asked for. The Hebrew inside menus and
+  the footer is handled per-element, not by flipping the whole page.
+-->
+<html lang="he" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;">
+<style>__CSS__</style>
+</head>
+<body>
+  <div class="backdrop" id="backdrop"></div>
+
+  <div class="card" id="card" role="dialog" aria-label="סייר קבצים">
+    <header class="bar">
+      <button class="iconbtn" id="back"   title="אחורה (Alt+←)"        tabindex="-1">←</button>
+      <button class="iconbtn" id="fwd"    title="קדימה (Alt+→)"        tabindex="-1">→</button>
+      <button class="iconbtn" id="up"     title="תיקייה למעלה (Backspace)" tabindex="-1">↑</button>
+      <div class="crumbs" id="crumbs"></div>
+      <input class="filter" id="filter" type="text" spellcheck="false"
+             placeholder="סינון (Ctrl+F)" tabindex="-1">
+      <button class="iconbtn" id="hidden" title="הצג פריטים מוסתרים (Ctrl+H)" tabindex="-1">◌</button>
+      <button class="iconbtn close" id="close" title="סגור (Esc)" tabindex="-1">✕</button>
+    </header>
+
+    <div class="panes">
+      <div class="pane tree" id="tree" tabindex="0" role="tree" aria-label="עץ תיקיות"></div>
+      <div class="split" id="split" role="separator" aria-orientation="vertical"></div>
+      <div class="pane list" id="list" tabindex="0" role="listbox" aria-label="תוכן התיקייה"></div>
+    </div>
+
+    <footer class="foot">
+      <span class="status" id="status"></span>
+      <span class="sp"></span>
+      <span class="hint">Tab מעבר בין חלוניות · ←→ פתיחה/סגירה · Enter פתיחה · F5 הרצה · תפריט ימני / Shift+F10 · Esc סגירה</span>
+      <span class="build" id="build"></span>
+    </footer>
+  </div>
+
+  <div class="menu" id="menu" hidden role="menu"></div>
+  <div class="submenu" id="submenu" hidden role="menu"></div>
+
+  <div class="dialogwrap" id="dialogwrap" hidden>
+    <div class="dialog" id="dialog" role="dialog" aria-modal="true"></div>
+  </div>
+
+<script>__JS__</script>
+</body>
+</html>

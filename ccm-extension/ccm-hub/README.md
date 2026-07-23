@@ -1,6 +1,7 @@
 # ccm-hub — VS Code extension
 
-**Build:** `2026-07-10 09:04 v14 close-guard`
+**Build:** see `build.js` — the one constant every surface reads
+(currently `2026-07-23 23:12 v23 file-browser`)
 
 A tiny, buildless VS Code extension that opens a Claude Code session as a **new
 integrated terminal in the current window** — so every session collects in one
@@ -98,7 +99,49 @@ persisted under `~/.claude/projects/`. `Process` (2), `Shutdown` (1) and
 `Extension` (4) exits are silent: those are claude quitting on its own, VS Code
 closing, and our own `dispose()`.
 
-### 4. A URI
+### 4. `Alt+E` — the floating file browser
+
+A two-pane browser — folder tree on the left, contents on the right — drawn as a
+centred card over a dimmed backdrop, driven entirely from the keyboard, and
+disposed the moment it stops being the active tab. Code lives in `browser/`.
+
+**Why a webview panel and not a real floating window.** The extension API exposes
+no floating window. `createWebviewPanel` is the only surface an extension can
+paint freely, and it lands in the editor area as a tab; the floating *behaviour*
+comes from `preserveFocus: false` + a backdrop + `onDidChangeViewState → dispose`,
+the same recipe the explain card already uses. VS Code 1.85+ *can* move an editor
+into an OS auxiliary window (`workbench.action.moveEditorToNewWindow`), but such a
+window has no "close when you touch something else" semantics — it would break the
+requirement rather than serve it.
+
+**Why the dialogs are drawn inside the webview.** `showInputBox` /
+`showWarningMessage` take focus, and this panel closes on blur — a rename through
+a native dialog would kill the browser mid-rename. Rename, create, delete-confirm
+and the missing-agent prompt are all painted in `webview.js`.
+
+**The agent submenu.** `browser/agents.js` probes PATH itself (`existsSync` over
+`PATH` × `PATHEXT`, ~1-3ms) rather than spawning `where.exe` per agent (~50ms × 8,
+a visible stutter on a menu that must appear instantly). A miss is never treated
+as "cannot run": a process cannot see PATH edits made after it started, so a
+missing agent is shown greyed with **install** *and* **run anyway**. Claude is
+routed back through `openSession` in `extension.js` so the close guard, the
+restore offer and the already-running check keep applying; every other agent gets
+a named terminal, because no hook writes an OSC title into one and an unnamed tab
+would just read `powershell`.
+
+**Running a file.** `fsops.runnerFor` maps extension → argv, and `commandLine`
+quotes every element for PowerShell (`& 'powershell' '-File' 'C:\it''s\x.ps1'`).
+An unknown extension falls through to `openExternal`, i.e. the OS association —
+what a double-click in Explorer does. `Enter` deliberately *opens* rather than
+runs; ▶ / `F5` / `Ctrl+Enter` run, and `ccmHub.browser.enterRuns` flips `Enter`.
+
+**One trap, already paid for.** `webview.html` carries `__CSS__` and `__JS__`
+placeholders that `index.js` swaps for the real files. `String.replace` hits the
+**first** occurrence only, so mentioning either token again — even in a comment —
+silently eats the substitution and ships a page with no script. A test asserts the
+composed HTML contains neither token.
+
+### 5. A URI
 
 Anything (the Explorer right-click launcher, a browser, another script) can fire:
 
@@ -122,7 +165,7 @@ does it directly and reliably.
 `Api`, which beats `${sequence}` *permanently* — the tab freezes on that name and
 every OSC title the hooks write is silently ignored.
 
-**`Alt+O` and `Alt+Q` must be in `terminal.integrated.commandsToSkipShell`.** A
+**`Alt+O`, `Alt+Q` and `Alt+E` must be in `terminal.integrated.commandsToSkipShell`.** A
 keypress in a focused terminal is forwarded to the shell unless its command id is
 on that list, and a custom command is never on VS Code's 159-entry default.
 Without it, Alt+O would be eaten by PowerShell and the picker would simply never
@@ -144,11 +187,16 @@ true exactly when a terminal has focus.
 | `ccmHub.projectsRoot` | `E:\MAIN_CLAUDE` | folders listed by `Alt+O` |
 | `ccmHub.claudeCommand` | `claude --dangerously-skip-permissions` | what runs in the new terminal |
 | `ccmHub.guardTerminalClose` | `true` | sets `confirmOnKill` to `always` (only if you have no value of your own) and offers to restore a killed session. `Alt+Q` asks regardless |
+| `ccmHub.ensureAutoSave` | `true` | fills `files.autoSave` with `afterDelay` when you have no value of your own |
+| `ccmHub.browser.enterRuns` | `false` | make `Enter` **run** a runnable file in the `Alt+E` browser instead of opening it |
+| `ccmHub.browser.showHidden` | `false` | start the browser with dot-files visible (`Ctrl+H` toggles per session) |
+| `ccmHub.browser.agents` | `[]` | extra agents for the browser's AI submenu, or overrides of the built-ins by `id` |
 
 ## Commands
 
 - `ccm: Open project (recent first)` — the `Alt+O` picker
 - `ccm: Close terminal (backup / close / keep)` — the `Alt+Q` guard, also on both terminal context menus
+- `ccm: Open the floating file browser` — the `Alt+E` browser
 - `ccm: New Claude session in a terminal` — prompts for a path
 
 ## Also does

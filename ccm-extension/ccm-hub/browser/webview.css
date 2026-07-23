@@ -1,0 +1,326 @@
+/* ccm-hub / browser/webview.css
+ *
+ * Everything is drawn from VS Code's own theme variables, so the browser follows
+ * the user's colour theme instead of inventing a palette that clashes with it.
+ * Every var() carries a fallback: a theme that does not define one must degrade
+ * to something readable, never to a transparent-on-transparent panel.
+ */
+
+:root { color-scheme: light dark; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--vscode-font-family, "Segoe UI", system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--vscode-foreground, #ccc);
+}
+
+/* The card floats over a dimmed backdrop, and a click on the backdrop closes —
+ * so "clicking somewhere else" ends the browser whether that somewhere is inside
+ * this tab or outside it (outside is handled by the panel's own blur handler). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.card {
+  position: absolute;
+  inset: 18px;
+  max-width: 1180px;
+  max-height: 820px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background, #1e1e1e));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, rgba(128,128,128,.35)));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------------------------------------------------------------- title bar */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,.28));
+  background: var(--vscode-editorGroupHeader-tabsBackground, rgba(128,128,128,.08));
+}
+
+.iconbtn {
+  all: unset;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: .78;
+}
+.iconbtn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.2)); }
+.iconbtn[disabled] { opacity: .25; cursor: default; background: none; }
+.iconbtn.on { opacity: 1; background: var(--vscode-inputOption-activeBackground, rgba(0,122,204,.35)); }
+.iconbtn.close:hover { background: var(--vscode-inputValidation-errorBackground, rgba(229,72,77,.35)); }
+
+/* The path, one clickable segment per folder. Kept LTR: a Windows path read
+ * right-to-left is unreadable even to a Hebrew speaker. */
+.crumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  direction: ltr;
+  white-space: nowrap;
+}
+.crumb {
+  all: unset;
+  cursor: pointer;
+  padding: 3px 7px;
+  border-radius: 5px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crumb:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.2)); }
+.crumb.last { font-weight: 600; }
+.crumbsep { opacity: .45; flex: 0 0 auto; }
+
+.filter {
+  flex: 0 0 190px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  unicode-bidi: plaintext;
+  color: var(--vscode-input-foreground, inherit);
+  background: var(--vscode-input-background, rgba(128,128,128,.14));
+  border: 1px solid var(--vscode-input-border, transparent);
+  outline: none;
+}
+.filter:focus { border-color: var(--vscode-focusBorder, #007acc); }
+
+/* ------------------------------------------------------------------- panes */
+
+.panes {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.pane {
+  height: 100%;
+  overflow: auto;
+  outline: none;
+  padding: 6px 0;
+}
+.tree { flex: 0 0 290px; border-right: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,.22)); }
+.list { flex: 1 1 auto; min-width: 0; }
+
+.split { flex: 0 0 3px; cursor: col-resize; background: transparent; }
+.split:hover { background: var(--vscode-focusBorder, #007acc); }
+
+/* A pane that does not have focus keeps its selection visible but muted, so the
+ * user can always see where they were in the other pane — the same convention
+ * Explorer uses, and the reason list.inactiveSelection* exists as a theme key. */
+.pane:not(:focus) .row.sel { background: var(--vscode-list-inactiveSelectionBackground, rgba(128,128,128,.22)); }
+.pane:focus .row.sel {
+  background: var(--vscode-list-activeSelectionBackground, #0a4a75);
+  color: var(--vscode-list-activeSelectionForeground, #fff);
+}
+.pane:focus .row.sel .meta { color: inherit; opacity: .75; }
+.pane:focus .row.cursor { outline: 1px solid var(--vscode-list-focusOutline, #ffb300); outline-offset: -1px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.row:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,.14)); }
+.row .name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+.row .glyph { flex: 0 0 auto; width: 16px; text-align: center; font-size: 12px; }
+.row .meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: .55;
+  font-variant-numeric: tabular-nums;
+}
+.row .meta.size { width: 66px; text-align: right; }
+.row .meta.when { width: 108px; text-align: right; }
+.row.link .name { font-style: italic; }
+
+/* The ▶ affordance: the "click a file to run it" the browser was asked for. It
+ * only exists on rows that really have a runner, so it never promises a run it
+ * cannot deliver. */
+.run {
+  all: unset;
+  cursor: pointer;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 10px;
+  opacity: 0;
+  color: var(--vscode-charts-green, #7ee787);
+}
+.row:hover .run, .row.sel .run { opacity: .85; }
+.run:hover { opacity: 1 !important; background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.25)); }
+
+/* tree indentation + expander */
+.twisty {
+  flex: 0 0 auto;
+  width: 14px;
+  text-align: center;
+  font-size: 9px;
+  opacity: .7;
+  transition: transform .1s ease;
+}
+.twisty.empty { opacity: 0; }
+.twisty.open { transform: rotate(90deg); }
+
+.empty-note, .error-note {
+  padding: 14px 16px;
+  opacity: .6;
+  font-size: 12.5px;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+.error-note { color: var(--vscode-errorForeground, #e5484d); opacity: .95; }
+
+/* ------------------------------------------------------------------ footer */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 11px;
+  border-top: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,.22));
+  background: var(--vscode-editorGroupHeader-tabsBackground, rgba(128,128,128,.06));
+  opacity: .78;
+}
+.foot .sp { flex: 1 1 auto; }
+.foot .status, .foot .hint { direction: rtl; unicode-bidi: plaintext; }
+.foot .hint { opacity: .8; }
+.foot .build { direction: ltr; opacity: .6; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------- context menu */
+
+.menu, .submenu {
+  position: fixed;
+  z-index: 50;
+  min-width: 232px;
+  max-height: 82vh;
+  overflow: auto;
+  padding: 5px;
+  border-radius: 9px;
+  direction: rtl;
+  text-align: right;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground, #ccc));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-editorWidget-border, rgba(128,128,128,.35)));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.mi {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+}
+.mi .mlabel { flex: 1 1 auto; }
+.mi .mkey { font-size: 10.5px; opacity: .5; direction: ltr; }
+.mi .marrow { font-size: 9px; opacity: .6; }
+.mi .mglyph { flex: 0 0 auto; width: 16px; text-align: center; }
+.mi.on { background: var(--vscode-menu-selectionBackground, #0a4a75); color: var(--vscode-menu-selectionForeground, #fff); }
+.mi.on .mkey { opacity: .75; }
+.mi.danger.on { background: var(--vscode-inputValidation-errorBackground, #5a1d1d); }
+.mi.off { opacity: .45; }
+.msep { height: 1px; margin: 5px 8px; background: var(--vscode-menu-separatorBackground, rgba(128,128,128,.3)); }
+.mtitle { padding: 5px 10px 3px; font-size: 10.5px; opacity: .55; }
+
+/* ------------------------------------------------------------- dialogs */
+
+.dialogwrap {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+.dialog {
+  min-width: 380px;
+  max-width: 560px;
+  padding: 18px 20px 14px;
+  border-radius: 10px;
+  direction: rtl;
+  text-align: right;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,.35));
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+.dialog h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; unicode-bidi: plaintext; }
+.dialog p { margin: 0 0 12px; font-size: 12.5px; opacity: .8; line-height: 1.6; unicode-bidi: plaintext; }
+.dialog input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  margin-bottom: 14px;
+  border-radius: 6px;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: plaintext;
+  font-family: var(--vscode-editor-font-family, Consolas, monospace);
+  color: var(--vscode-input-foreground, inherit);
+  background: var(--vscode-input-background, rgba(128,128,128,.14));
+  border: 1px solid var(--vscode-focusBorder, #007acc);
+  outline: none;
+}
+.dialog .btns { display: flex; gap: 8px; justify-content: flex-start; }
+.dbtn {
+  all: unset;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  background: var(--vscode-button-secondaryBackground, rgba(128,128,128,.2));
+  color: var(--vscode-button-secondaryForeground, inherit);
+}
+.dbtn.primary {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+}
+.dbtn.danger { background: var(--vscode-inputValidation-errorBackground, #5a1d1d); }
+.dbtn.on { outline: 2px solid var(--vscode-focusBorder, #007acc); outline-offset: 1px; }

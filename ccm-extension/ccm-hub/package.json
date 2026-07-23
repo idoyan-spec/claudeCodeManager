@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -31,6 +31,10 @@
         "title": "ccm: Export Markdown to PDF (RTL)",
         "category": "ccm",
         "icon": "$(file-pdf)"
+      },
+      {
+        "command": "ccmHub.openFileBrowser",
+        "title": "ccm: Open the floating file browser"
       }
     ],
     "keybindings": [
@@ -41,6 +45,10 @@
       {
         "command": "ccmHub.closeSession",
         "key": "alt+q"
+      },
+      {
+        "command": "ccmHub.openFileBrowser",
+        "key": "alt+e"
       },
       {
         "command": "ccmHub.copyTerminalSelection",
@@ -100,6 +108,33 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Protect terminals from being closed by accident. Sets `#terminal.integrated.confirmOnKill#` to `always` (one terminal) and `#window.confirmBeforeClose#` to `always` (the whole window's X) — each only if you have not set it yourself — and offers to restore a Claude session you killed. While the window guard is `always`, a redundant `#terminal.integrated.confirmOnExit#: always` is removed so one close asks one question, not two. `Alt+Q` asks *backup / close / keep* regardless of this setting."
+        },
+        "ccmHub.browser.enterRuns": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "In the `Alt+E` file browser, make **Enter** *run* a file that has a known runner instead of opening it in the editor. Off by default so Enter is always safe; the ▶ button on the row, `F5` and `Ctrl+Enter` run a file either way."
+        },
+        "ccmHub.browser.showHidden": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Start the `Alt+E` file browser with dot-files and dot-folders visible. `Ctrl+H` toggles it for the current session regardless."
+        },
+        "ccmHub.browser.agents": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Extra coding agents for the browser's *סוכן AI* submenu, or overrides for the built-in ones (`claude`, `codex`, `gemini`, `copilot`, `cursor`, `opencode`, `qwen`, `aider`). Each entry is `{ \"id\", \"label\", \"command\", \"bin\", \"glyph\", \"pkg\" }` — `bin` is the executable looked for on PATH (defaults to the first word of `command`), and `pkg` is the npm package offered when it is missing. An entry whose `id` matches a built-in is merged over it.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "command": { "type": "string" },
+              "bin": { "type": "string" },
+              "glyph": { "type": "string" },
+              "pkg": { "type": ["string", "null"] }
+            }
+          }
         },
         "ccmHub.ensureAutoSave": {
           "type": "boolean",

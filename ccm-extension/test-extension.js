@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-19 04:20 v22 night-autonomy
+// test-extension.js  |  BUILD: 2026-07-23 23:12 v23 file-browser
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -13,6 +13,10 @@
 //      titleSource to `Api`, which permanently beats `${sequence}` and freezes the
 //      tab — the hooks' status glyphs then silently stop appearing. That regression
 //      shipped once (fixed in v6); this test makes it loud.
+//
+//   1b. The Alt+E browser must never hand an unquoted path to a shell, and the
+//      agent menu must never claim an agent is installed when it is not. Both are
+//      covered below against the real filesystem of this repository.
 //
 //   2. `backupThenClose` closes the terminal on exactly ONE outcome: the hooks
 //      reported the backup finished. Timeout, cancel, a question from Claude, a
@@ -125,12 +129,25 @@ const vscodeStub = {
     createWebviewPanel(viewType, title, showOpts, options) {
       const panel = {
         viewType, title, active: true,
-        webview: { html: '', onDidReceiveMessage(fn) { this._msg = fn; return { dispose() {} }; } },
+        webview: {
+          html: '',
+          // Everything the host pushes to the browser, in order — the tests read
+          // this instead of a rendered DOM.
+          posted: [],
+          postMessage(m) { this.posted.push(m); return Promise.resolve(true); },
+          onDidReceiveMessage(fn) { this._msg = fn; return { dispose() {} }; }
+        },
         _viewStateFns: [],
+        _disposeFns: [],
         onDidChangeViewState(fn) { this._viewStateFns.push(fn); return { dispose() {} }; },
+        onDidDispose(fn) { this._disposeFns.push(fn); return { dispose() {} }; },
         _fireViewState(active) { this.active = active; this._viewStateFns.forEach((fn) => fn({ webviewPanel: this })); },
-        dispose() { log.push('webview.dispose'); },
-        reveal() {}
+        // Simulate the webview talking back to the host, and wait for the handler
+        // (it is async) to settle.
+        _send(m) { return Promise.resolve(this.webview._msg(m)); },
+        _last(type) { return [...this.webview.posted].reverse().find((m) => m.type === type); },
+        dispose() { log.push('webview.dispose'); this._disposeFns.forEach((fn) => fn()); },
+        reveal() { log.push('webview.reveal'); }
       };
       log.push('createWebviewPanel:' + viewType);
       lastWebview = panel;
@@ -139,6 +156,17 @@ const vscodeStub = {
   },
   workspace: {
     textDocuments: [],
+    // Set by the browser tests; undefined everywhere else, which is exactly the
+    // "no folder open" case the browser has to fall back from.
+    workspaceFolders: undefined,
+    // The mutating half of the file browser. Stubbed, not real: a test suite
+    // that deletes files to prove it can delete files is a bad trade.
+    fs: {
+      writeFile: (u) => { log.push('fs.writeFile:' + u.fsPath); return Promise.resolve(); },
+      createDirectory: (u) => { log.push('fs.createDirectory:' + u.fsPath); return Promise.resolve(); },
+      rename: (a, b, o) => { log.push('fs.rename:' + a.fsPath + '->' + b.fsPath + ' overwrite=' + !!(o && o.overwrite)); return Promise.resolve(); },
+      delete: (u, o) => { log.push('fs.delete:' + u.fsPath + ' trash=' + !!(o && o.useTrash)); return Promise.resolve(); }
+    },
     openTextDocument: (uri) => {
       const d = vscodeStub.workspace.textDocuments.find((x) => x.uri.fsPath === (uri && uri.fsPath));
       return d ? Promise.resolve(d) : Promise.reject(new Error('not found'));
@@ -187,6 +215,9 @@ require.cache[renderPath] = {
 
 const ext = require(path.join(EXT_DIR, 'extension.js'));
 const { rankedProjects, encodeProjectDir, ago } = require(path.join(EXT_DIR, 'projects.js'));
+const { BUILD } = require(path.join(EXT_DIR, 'build.js'));
+const fsops = require(path.join(EXT_DIR, 'browser', 'fsops.js'));
+const { listAgents } = require(path.join(EXT_DIR, 'browser', 'agents.js'));
 
 // Shrink the backup poll from minutes to milliseconds.
 ext.timing.pollMs = 5;
@@ -196,6 +227,8 @@ ext.timing.backupTimeoutMs = 400;
 const store = {};
 const context = {
   subscriptions: [],
+  // The browser reads webview.html/.css/.js from here at panel-creation time.
+  extensionPath: EXT_DIR,
   globalState: { get: (k, d) => (k in store ? store[k] : d), update: (k, v) => { store[k] = v; return Promise.resolve(); } },
   workspaceState: { get: () => false, update: () => Promise.resolve() }
 };
@@ -315,7 +348,7 @@ async function openVia(folder) {
   log.length = 0;
   quickPickChoice = null;
   await vscodeStub.commands._handlers['ccmHub.openProjectPicker']();
-  assert('title carries the build stamp', log.some((l) => l.includes('v22 night-autonomy')));
+  assert('title carries the build stamp', log.some((l) => l.includes(BUILD)));
   assert('Esc opens nothing', !log.some((l) => l.startsWith('createTerminal')));
   assert('Esc records no MRU', !('ccmHub.mru' in store));
 
@@ -496,6 +529,150 @@ async function openVia(folder) {
   // Leave no stray editor state for the close tests that follow.
   vscodeStub.window.activeTextEditor = undefined;
   vscodeStub.workspace.textDocuments = [];
+
+  // ---- the Alt+E file browser ---------------------------------------------
+  console.log('\nbrowser: the disk layer');
+  const HUB = EXT_DIR;                          // .../ccm-extension/ccm-hub
+  const REPO = path.join(__dirname, '..');      // .../claudeCodeManager
+
+  const hubList = fsops.readDir(HUB);
+  assert('folders sort before files',
+    hubList.filter((e) => e.dir).length > 0 &&
+    hubList.findIndex((e) => !e.dir) > hubList.map((e) => e.dir).lastIndexOf(true),
+    hubList.map((e) => (e.dir ? 'D' : 'f') + e.name).join(','));
+  const extEntry = hubList.find((e) => e.name === 'extension.js');
+  assert('a .js file is code and is runnable', !!extEntry && extEntry.kind === 'code' && extEntry.runnable);
+  const pkgEntry = hubList.find((e) => e.name === 'package.json');
+  assert('a .json file is data and is NOT runnable — no ▶ it cannot honour',
+    !!pkgEntry && pkgEntry.kind === 'data' && pkgEntry.runnable === false);
+  assert('readSubdirs returns directories only',
+    fsops.readSubdirs(HUB).every((e) => e.dir) && fsops.readSubdirs(HUB).some((e) => e.name === 'browser'));
+  assert('dot-files are hidden by default',
+    !fsops.readDir(REPO).some((e) => e.name === '.gitignore'));
+  assert('Ctrl+H shows them', fsops.readDir(REPO, { showHidden: true }).some((e) => e.name === '.gitignore'));
+  assert('hasSubdirs is true for a folder with children', fsops.hasSubdirs(HUB) === true);
+  assert('parentOf stops at a filesystem root instead of looping forever',
+    fsops.parentOf(path.parse(HUB).root) === '');
+  assert('ancestryWithin walks root -> target inclusive',
+    fsops.ancestryWithin(REPO, HUB).length === 3, JSON.stringify(fsops.ancestryWithin(REPO, HUB)));
+  assert('ancestryWithin refuses a target outside the root',
+    fsops.ancestryWithin('E:\\a', 'E:\\b').length === 0);
+  assert('.ps1 runs through powershell -File',
+    (fsops.runnerFor('C:\\x\\a.ps1') || []).join(' ') === 'powershell -ExecutionPolicy Bypass -File C:\\x\\a.ps1');
+  assert('an unknown extension has no runner (it falls through to the OS)',
+    fsops.runnerFor('C:\\x\\notes.txt') === null);
+
+  console.log('\nbrowser: the agent registry');
+  const agents = listAgents({ claudeCommand: 'claude --flag' });
+  assert('every agent reports whether it is installed',
+    agents.length >= 8 && agents.every((a) => typeof a.installed === 'boolean'));
+  assert('the Claude row honours ccmHub.claudeCommand',
+    (agents.find((a) => a.id === 'claude') || {}).command === 'claude --flag');
+  const bogus = listAgents({ custom: [{ id: 'nope', label: 'Nope', command: 'ccm-no-such-binary-xyz' }] })
+    .find((a) => a.id === 'nope');
+  assert('an agent that is not on PATH is reported missing, not assumed present',
+    !!bogus && bogus.installed === false);
+  assert('a custom agent infers its binary from the first word of its command',
+    !!bogus && bogus.bin === 'ccm-no-such-binary-xyz');
+  const over = listAgents({ custom: [{ id: 'gemini', label: 'G2' }] }).find((a) => a.id === 'gemini');
+  assert('a custom entry merges over the built-in of the same id, keeping the rest',
+    !!over && over.label === 'G2' && over.pkg === '@google/gemini-cli');
+
+  const { commandLine } = require(path.join(EXT_DIR, 'browser', 'index.js'));
+  assert("a quote in a path stays inside the PowerShell literal",
+    commandLine(["C:\\it's\\x.ps1"]).includes("it''s"), commandLine(["C:\\it's\\x.ps1"]));
+
+  console.log('\nbrowser: the panel');
+  const browserCmd = vscodeStub.commands._handlers['ccmHub.openFileBrowser'];
+  vscodeStub.workspace.workspaceFolders = [{ name: 'claudeCodeManager', uri: { fsPath: REPO } }];
+
+  lastWebview = null;
+  log.length = 0;
+  browserCmd();
+  const bw = lastWebview;
+  assert('Alt+E opens a webview panel', !!bw && bw.viewType === 'ccmBrowser');
+  assert('the page inlines its own script and stylesheet — a webview cannot load either from disk',
+    !!bw && bw.webview.html.includes('acquireVsCodeApi') &&
+    !bw.webview.html.includes('__JS__') && !bw.webview.html.includes('__CSS__'));
+
+  await bw._send({ type: 'ready' });
+  const init = bw._last('init');
+  assert('init carries the build stamp the footer shows', !!init && init.build === BUILD);
+  assert('init roots the tree at the open workspace', !!init && init.roots[0].path === REPO);
+  assert('init ships the agent list to the menu', !!init && init.agents.some((a) => a.id === 'codex'));
+
+  await bw._send({ type: 'dir', path: HUB });
+  const dirMsg = bw._last('dir');
+  assert('a dir request is answered with that folder listing',
+    !!dirMsg && dirMsg.path === HUB && dirMsg.entries.some((e) => e.name === 'extension.js'));
+  assert('the listing carries the parent, so Backspace has somewhere to go',
+    !!dirMsg && dirMsg.parent === __dirname);
+
+  log.length = 0;
+  await bw._send({ type: 'act', act: 'run', path: path.join(__dirname, 'install-extension.ps1') });
+  const runSent = log.find((l) => l.startsWith('sendText:'));
+  assert('running a .ps1 goes through powershell -File',
+    !!runSent && runSent.includes('-File') && runSent.includes('install-extension.ps1'), runSent);
+  assert('every argument of a run is quoted', !!runSent && runSent.startsWith("sendText:& '"), runSent);
+  assert('the run terminal opens in the file\'s own folder',
+    log.some((l) => l.startsWith('createTerminal:' + __dirname)), JSON.stringify(log));
+  assert('running a file closes the browser', log.includes('webview.dispose'));
+
+  lastWebview = null;
+  browserCmd();
+  const bw2 = lastWebview;
+  await bw2._send({ type: 'ready' });
+  log.length = 0;
+  await bw2._send({ type: 'act', act: 'agent', agentId: 'codex', path: REPO });
+  assert('an agent terminal runs that agent\'s command',
+    log.some((l) => l.startsWith('sendText:') && l.includes('codex')), JSON.stringify(log));
+  assert('an agent terminal IS named — no hook writes a title into it',
+    log.some((l) => l.startsWith('createTerminal:' + REPO) && !l.includes('name=<none>')), JSON.stringify(log));
+
+  lastWebview = null;
+  browserCmd();
+  const bw3 = lastWebview;
+  await bw3._send({ type: 'ready' });
+  log.length = 0;
+  await bw3._send({ type: 'act', act: 'agent', agentId: 'claude', path: 'E:\\MAIN_CLAUDE\\BrowserClaude' });
+  assert('Claude routes through openSession, which must still pass NO terminal name',
+    log.some((l) => l === 'createTerminal:E:\\MAIN_CLAUDE\\BrowserClaude name=<none>'), JSON.stringify(log));
+  assert('...and therefore runs the configured claude command',
+    log.some((l) => l.startsWith('sendText:') && l.includes('claude --dangerously-skip-permissions')));
+
+  lastWebview = null;
+  browserCmd();
+  const bw4 = lastWebview;
+  await bw4._send({ type: 'ready' });
+  log.length = 0;
+  await bw4._send({ type: 'act', act: 'delete', path: path.join(HUB, 'no-such-file.txt') });
+  assert('delete goes to the recycle bin, never a permanent unlink',
+    log.some((l) => l.startsWith('fs.delete:') && l.includes('trash=true')), JSON.stringify(log));
+  await bw4._send({ type: 'act', act: 'rename', path: path.join(HUB, 'a.txt'), name: 'b.txt' });
+  assert('rename refuses to overwrite an existing file',
+    log.some((l) => l.startsWith('fs.rename:') && l.includes('overwrite=false')), JSON.stringify(log));
+  await bw4._send({ type: 'act', act: 'copy', text: 'E:\\x' });
+  assert('copy path goes to the real clipboard', log.includes('clipboard.write:E:\\x'));
+  assert('none of those closed the browser — only actions that move focus do',
+    !log.includes('webview.dispose'), JSON.stringify(log));
+
+  log.length = 0;
+  browserCmd();
+  assert('a second Alt+E reveals the open browser instead of stacking a second one',
+    log.includes('webview.reveal') && !log.some((l) => l.startsWith('createWebviewPanel')), JSON.stringify(log));
+
+  log.length = 0;
+  bw4._fireViewState(false);
+  assert('the browser closes the moment it stops being the active tab',
+    log.includes('webview.dispose'));
+
+  vscodeStub.workspace.workspaceFolders = undefined;
+  lastWebview = null;
+  browserCmd();
+  await lastWebview._send({ type: 'ready' });
+  assert('with no folder open the tree falls back to projectsRoot',
+    (lastWebview._last('init') || {}).roots[0].path === ROOT);
+  lastWebview.dispose();
 
   // ---- the three-way close -------------------------------------------------
   const closeCmd = vscodeStub.commands._handlers['ccmHub.closeSession'];
