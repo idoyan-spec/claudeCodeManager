@@ -17,12 +17,15 @@
     3. Checks that an Edge/Chrome exists for the Markdown->PDF export.
     4. Runs install.ps1        -> ccm command, VS Code settings, keybindings, hooks.
     5. Runs install-extension  -> the ccm-hub extension (Alt+O/Alt+Q/Alt+E, RTL PDF).
-    6. Installs/updates the Voice-to-Claude dictation tool (separate repo,
+    6. Installs the VS Code extensions Ido works with: Claude Code itself,
+       RTL for VS Code Agents (Hebrew right-to-left in the Claude chat,
+       side-loaded from its public GitHub repo), and Markdown PDF.
+    7. Installs/updates the Voice-to-Claude dictation tool (separate repo,
        cloned as a sibling folder): Python deps + autostart service. `-NoVoice` skips.
-    7. API keys: if this machine has no key source for the explain feature, PROMPTS
+    8. API keys: if this machine has no key source for the explain feature, PROMPTS
        the machine's owner for their own Gemini key and stores it ENCRYPTED in
        Windows Credential Manager. Never written to a plaintext file.
-    8. Registers a hidden Task Scheduler job that re-runs this script silently
+    9. Registers a hidden Task Scheduler job that re-runs this script silently
        (at logon + every 12h), so every machine keeps itself up to date with
        whatever Ido pushes. `-NoAutoUpdate` skips.
 
@@ -33,7 +36,7 @@
   Both repos are PUBLIC (MIT license) - cloning and pulling needs no GitHub
   account, no login, no invitation. Only Ido's account can push changes.
 
-  BUILD: 2026-07-30 10:42 v25 public-repos
+  BUILD: 2026-07-30 11:58 v26 vscode-extensions
 #>
 [CmdletBinding()]
 param(
@@ -44,7 +47,7 @@ param(
     [switch]$Silent         # non-interactive (used by the auto-update task): never prompts
 )
 
-$BUILD = '2026-07-30 10:42 v25 public-repos'
+$BUILD = '2026-07-30 11:58 v26 vscode-extensions'
 $root  = Split-Path -Parent $PSScriptRoot
 $warnings = 0
 
@@ -123,13 +126,13 @@ Write-Host ""
 
 # --- 0. Self-update --------------------------------------------------------
 # Re-running after a `git pull` is the whole update story: pull, then re-install.
-Info "[0/8] Update from git"
+Info "[0/9] Update from git"
 if ($NoPull) { Ok "skipped (-NoPull)" }
 else { Update-GitRepo $root "claudeCodeManager" }
 Write-Host ""
 
 # --- 1. Claude Code --------------------------------------------------------
-Info "[1/8] Claude Code"
+Info "[1/9] Claude Code"
 if (Have 'claude') {
     $v = (claude --version 2>$null)
     Ok "installed ($v)"
@@ -151,7 +154,7 @@ Write-Host ""
 # --- 2. Node.js (informational) --------------------------------------------
 # The RTL PDF export runs inside VS Code's bundled Node, so end users do NOT need
 # system Node. It is only needed to run the test suite or the md2pdf CLI directly.
-Info "[2/8] Node.js (optional - tests / md2pdf CLI only)"
+Info "[2/9] Node.js (optional - tests / md2pdf CLI only)"
 if (Have 'node') {
     Ok "installed ($(node --version 2>$null))"
 } else {
@@ -160,7 +163,7 @@ if (Have 'node') {
 Write-Host ""
 
 # --- 3. A browser for the PDF export ---------------------------------------
-Info "[3/8] Browser for Markdown->PDF"
+Info "[3/9] Browser for Markdown->PDF"
 # Kept to Windows PowerShell 5.1 syntax (no ternary) so a fresh Win10 box runs it.
 $pf   = $env:ProgramFiles
 $pf86 = ${env:ProgramFiles(x86)}
@@ -181,7 +184,7 @@ if ($browsers.Count) {
 Write-Host ""
 
 # --- 4. ccm settings / keybindings / hooks ---------------------------------
-Info "[4/8] ccm settings, keybindings, hooks (install.ps1)"
+Info "[4/9] ccm settings, keybindings, hooks (install.ps1)"
 try {
     & (Join-Path $PSScriptRoot 'install.ps1')
 } catch {
@@ -190,7 +193,7 @@ try {
 Write-Host ""
 
 # --- 5. The ccm-hub extension ----------------------------------------------
-Info "[5/8] ccm-hub VS Code extension (Alt+O picker, close-guard, Alt+E browser, RTL PDF)"
+Info "[5/9] ccm-hub VS Code extension (Alt+O picker, close-guard, Alt+E browser, RTL PDF)"
 try {
     & (Join-Path $root 'ccm-extension\install-extension.ps1')
 } catch {
@@ -198,11 +201,61 @@ try {
 }
 Write-Host ""
 
-# --- 6. Voice-to-Claude dictation tool --------------------------------------
+# --- 6. VS Code extensions ---------------------------------------------------
+# The rest of the toolkit used inside VS Code: the Claude Code extension itself,
+# RTL for VS Code Agents (Hebrew right-to-left in the Claude chat; not on the
+# marketplace, so side-loaded from its public GitHub repo the same way ccm-hub
+# is), and Markdown PDF. Marketplace ones are install-if-missing only - VS Code
+# keeps them updated by itself afterwards.
+Info "[6/9] VS Code extensions (Claude Code, RTL Hebrew, Markdown PDF)"
+if (-not (Have 'code')) {
+    Warn "the 'code' command is not on PATH - open VS Code once, run 'Shell Command: Install code command in PATH', then re-run bootstrap."
+} else {
+    $installed = @(code --list-extensions 2>$null)
+    foreach ($ext in @('anthropic.claude-code', 'yzane.markdown-pdf')) {
+        if ($installed -contains $ext) {
+            Ok "$ext already installed"
+        } else {
+            code --install-extension $ext 2>&1 | ForEach-Object { Write-Host "       $_" -ForegroundColor DarkGray }
+            if ($LASTEXITCODE -eq 0) { Ok "$ext installed" } else { Warn "could not install $ext - see above." }
+        }
+    }
+
+    # RTL for VS Code Agents (GuyRonnen, GPL-3.0, github.com/GuyRonnen/rtl-for-vs-code-agents).
+    # Buildless plain-JS extension: cloning it and copying into the extensions
+    # folder IS the install (same mechanism as install-extension.ps1 for ccm-hub).
+    $extRoot = Join-Path $env:USERPROFILE '.vscode\extensions'
+    $rtlHere = @(Get-ChildItem -Path $extRoot -Directory -Filter '*rtl-for-vs-code-agents*' -ErrorAction SilentlyContinue)
+    if ($rtlHere.Count) {
+        Ok "RTL for VS Code Agents already installed ($($rtlHere[0].Name))"
+    } elseif (-not (Have 'git')) {
+        Warn "git not found - cannot fetch the RTL extension; Hebrew in the Claude chat will render left-to-right."
+    } else {
+        $tmp = Join-Path $env:TEMP "ccm-rtl-ext-$PID"
+        if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
+        git clone --depth 1 https://github.com/GuyRonnen/rtl-for-vs-code-agents.git $tmp 2>&1 |
+            ForEach-Object { Write-Host "       $_" -ForegroundColor DarkGray }
+        $pkgPath = Join-Path $tmp 'package.json'
+        if (Test-Path $pkgPath) {
+            $pkg  = Get-Content $pkgPath -Raw | ConvertFrom-Json
+            $dest = Join-Path $extRoot "local.$($pkg.name)-$($pkg.version)"
+            New-Item -ItemType Directory -Force -Path $extRoot | Out-Null
+            Remove-Item (Join-Path $tmp '.git') -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item $tmp $dest -Recurse -Force
+            Ok "RTL for VS Code Agents $($pkg.version) side-loaded -> $dest"
+        } else {
+            Warn "could not fetch the RTL extension (network problem?). Re-run bootstrap to retry."
+        }
+        Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+Write-Host ""
+
+# --- 7. Voice-to-Claude dictation tool --------------------------------------
 # Separate private repo. Transcription is LOCAL (faster-whisper) - no key, no cloud.
 # Lives as a sibling folder of this repo; the folder name differs between machines
 # (Hebrew on the original machine), so we find it by its files, not by its name.
-Info "[6/8] Voice-to-Claude dictation tool (Right Ctrl push-to-talk)"
+Info "[7/9] Voice-to-Claude dictation tool (Right Ctrl push-to-talk)"
 if ($NoVoice) {
     Ok "skipped (-NoVoice)"
 } else {
@@ -266,12 +319,12 @@ if ($NoVoice) {
 }
 Write-Host ""
 
-# --- 7. API key for the explain-selection feature ---------------------------
+# --- 8. API key for the explain-selection feature ---------------------------
 # Dictation itself is fully local and needs NO key. Only the "explain selected
 # terminal text in plain Hebrew" card calls Google Gemini. Key sources, in the
 # order explain.py resolves them: env var -> Credential Manager -> bws (Ido's
 # machine). On a machine with none of those we ask its OWNER for their own key.
-Info "[7/8] Gemini API key (explain-selection feature only)"
+Info "[8/9] Gemini API key (explain-selection feature only)"
 if ($env:GEMINI_API_KEY) {
     Ok "GEMINI_API_KEY environment variable is set"
 } elseif ([CcmCred]::Exists('GEMINI_API_KEY')) {
@@ -298,12 +351,12 @@ if ($env:GEMINI_API_KEY) {
 }
 Write-Host ""
 
-# --- 8. Auto-update task ----------------------------------------------------
+# --- 9. Auto-update task ----------------------------------------------------
 # "When Ido pushes, every machine picks it up": a hidden per-user task re-runs this
 # script with -Silent (git pull + idempotent re-install) at logon and every 12h.
 # Same proven XML shape as the voice tool's watchdog task (element order matters -
 # schtasks rejects reordered children). IgnoreNew keeps overlapping runs impossible.
-Info "[8/8] Auto-update task (pulls + re-installs at logon and every 12h)"
+Info "[9/9] Auto-update task (pulls + re-installs at logon and every 12h)"
 if ($NoAutoUpdate) {
     Ok "skipped (-NoAutoUpdate)"
 } else {
