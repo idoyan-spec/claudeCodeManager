@@ -6,6 +6,7 @@
 // URI:  vscode://ccm.hub/session?path=<percent-encoded folder>
 // Key:  Alt+O  ->  ccmHub.openProjectPicker
 // Key:  Alt+Q  ->  ccmHub.closeSession      (backup / close / keep)
+// Key:  Alt+Shift+Q -> ccmHub.backupAllSessions (end of day: backup EVERY session, close each as it finishes)
 //
 // Both keys are LETTER bindings, and VS Code's default `keyboard.dispatch: "code"`
 // resolves them by finding the physical key that produces that letter on the ACTIVE
@@ -61,7 +62,11 @@ const EXPORT_PDF_COMMAND = 'ccmHub.exportMarkdownPdf';
 // joins the skip-shell list below — otherwise PowerShell eats the keystroke and
 // the browser never opens.
 const BROWSER_COMMAND = 'ccmHub.openFileBrowser';
-const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND, BROWSER_COMMAND];
+// Alt+Shift+Q — the end-of-day sweep: /session-backup in EVERY live ccm session,
+// each terminal closing on its own as its backup lands. Pressable from a terminal,
+// so it joins the skip-shell list too.
+const BACKUP_ALL_COMMAND = 'ccmHub.backupAllSessions';
+const SKIP_SHELL_COMMANDS = [PICKER_COMMAND, CLOSE_COMMAND, PROBE_COMMAND, BROWSER_COMMAND, BACKUP_ALL_COMMAND];
 const MRU_KEY = 'ccmHub.mru';
 
 // The status glyphs the ccm hooks write into the tab title, from
@@ -355,6 +360,54 @@ async function closeSession() {
     return 'close';
   }
   return backupThenClose(term, label);
+}
+
+// The end-of-day sweep (Alt+Shift+Q): back up EVERY live ccm session, then close
+// each one. One confirmation up front — naming every session it is about to
+// touch — then all the backups run IN PARALLEL: each session is its own repo and
+// its own Claude, so there is nothing to serialize, and the user should be able
+// to press this and walk away. Each terminal is closed by `backupThenClose`,
+// which keeps its invariant: only a finished backup closes a terminal; a
+// question, a timeout or a cancel leaves that terminal open (and the others
+// keep going independently).
+async function backupAllSessions() {
+  const live = [...sessions.entries()].filter(([, t]) => t.exitStatus === undefined);
+  if (!live.length) {
+    vscode.window.showInformationMessage('ccm: אין סשנים פתוחים לגבות.');
+    return 'none';
+  }
+
+  const labels = live.map(([folder]) => path.basename(folder));
+  const BACKUP = { title: 'גבה וסגור הכל' };
+  const KEEP = { title: 'בטל', isCloseAffordance: true };
+  const pick = await vscode.window.showWarningMessage(
+    `סוף יום: לגבות ולסגור ${live.length} סשנים?`,
+    {
+      modal: true,
+      detail:
+        labels.map((l) => `• ${l}`).join('\n') +
+        '\n\nכל סשן מריץ /session-backup במקביל, וכל טרמינל נסגר רק כשהגיבוי שלו הסתיים. ' +
+        'סשן שמחכה לתשובה או שלא סיים — נשאר פתוח.'
+    },
+    BACKUP,
+    KEEP
+  );
+  if (!pick || pick === KEEP) return 'keep';
+
+  const outcomes = await Promise.all(
+    live.map(([folder, term]) => backupThenClose(term, path.basename(folder)))
+  );
+
+  const closed = outcomes.filter((o) => o === 'done' || o === 'gone').length;
+  const open = outcomes.length - closed;
+  if (open === 0) {
+    vscode.window.showInformationMessage(`ccm: סוף יום — כל ${closed} הסשנים גובו ונסגרו. לילה טוב 🌙`);
+  } else {
+    vscode.window.showWarningMessage(
+      `ccm: ${closed} סשנים גובו ונסגרו; ${open} נשארו פתוחים (ראה הודעות למעלה) — טפל בהם וסגור ידנית.`
+    );
+  }
+  return outcomes;
 }
 
 // A ccm session the user killed. `TerminalExitReason.User` (3) is the deliberate
@@ -793,6 +846,10 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(CLOSE_COMMAND, () => closeSession())
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(BACKUP_ALL_COMMAND, () => backupAllSessions())
   );
 
   // The probe: copy the terminal selection so the voice service can read it. A thin

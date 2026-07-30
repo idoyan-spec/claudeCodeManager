@@ -1,4 +1,4 @@
-// test-extension.js  |  BUILD: 2026-07-23 23:12 v23 file-browser
+// test-extension.js  |  BUILD: 2026-07-30 12:20 v27 backup-all
 //
 // Runs the extension against a stubbed `vscode` module, with no VS Code involved.
 //
@@ -271,7 +271,7 @@ async function openVia(folder) {
   assert("keeps the user's existing skip-shell entries",
     !!upd && upd.includes('existing.user.command') &&
     upd.includes('ccmHub.openProjectPicker') && upd.includes('ccmHub.closeSession') &&
-    upd.includes('ccmHub.copyTerminalSelection'), upd);
+    upd.includes('ccmHub.copyTerminalSelection') && upd.includes('ccmHub.backupAllSessions'), upd);
   assert('turns confirmOnKill on (VS Code defaults to "editor", which skips panel terminals)',
     settingsStore['terminal.integrated'].confirmOnKill === 'always');
   assert('turns window.confirmBeforeClose on (asks before ANY window close, even with no terminals)',
@@ -808,6 +808,67 @@ async function openVia(folder) {
     await tick();
     assert(`a ${reason.toLowerCase()} exit offers no restore`, !log.some((l) => l.startsWith('WARN:')), JSON.stringify(log));
   }
+
+  // ---- backup all (Alt+Shift+Q, the end-of-day sweep) -----------------------
+  console.log('\nbackup all (end of day)');
+  const backupAllCmd = vscodeStub.commands._handlers['ccmHub.backupAllSessions'];
+
+  // Clean the table: dispose every terminal earlier tests left open, so the
+  // session count these tests assert on is theirs alone.
+  for (const term of vscodeStub.window._terms) { if (term.exitStatus === undefined) term.dispose(); }
+  await tick();
+
+  log.length = 0;
+  assert('with no live sessions there is nothing to sweep',
+    (await backupAllCmd()) === 'none' && !log.some((l) => l.startsWith('WARN:')), JSON.stringify(log));
+
+  const d1 = await openVia('E:\\MAIN_CLAUDE\\DayEndA');
+  const d2 = await openVia('E:\\MAIN_CLAUDE\\DayEndB');
+  d1.name = '🟨 ✓ DayEndA'; d2.name = '🟨 ✓ DayEndB';
+  log.length = 0;
+  warningChoice = null; // Esc
+  assert('Esc backs up nothing and closes nothing',
+    (await backupAllCmd()) === 'keep' &&
+    !log.some((l) => l === 'sendText:/session-backup') && !log.some((l) => l.startsWith('dispose:')),
+    JSON.stringify(log));
+  assert('the confirmation states how many sessions it is about to sweep',
+    /2/.test(lastWarningMessage), lastWarningMessage);
+  assert('"בטל" is the close affordance, so Esc and the X mean cancel',
+    lastWarningItems.length === 2 && lastWarningItems[1].isCloseAffordance === true,
+    JSON.stringify(lastWarningItems));
+
+  // Happy path: both sessions pick the prompt up and finish; both close.
+  log.length = 0;
+  warningChoice = 0; // גבה וסגור הכל
+  at(10, () => { d1.name = '🟨 ⟳ DayEndA'; d2.name = '🟨 ⟳ DayEndB'; });
+  at(40, () => { d1.name = '🟨 ✓ DayEndA'; });
+  at(60, () => { d2.name = '🟨 ✓ DayEndB'; });
+  let sweep = await backupAllCmd();
+  assert('every live session gets /session-backup',
+    log.filter((l) => l === 'sendText:/session-backup').length === 2, JSON.stringify(log));
+  assert('each terminal closes once ITS OWN backup lands',
+    Array.isArray(sweep) && sweep.length === 2 && sweep.every((o) => o === 'done') &&
+    log.filter((l) => l.startsWith('dispose:')).length === 2, JSON.stringify(sweep));
+  assert('the sweep signs off with a summary',
+    log.some((l) => l.startsWith('INFO:') && l.includes('סוף יום')), JSON.stringify(log.filter((l) => l.startsWith('INFO:'))));
+
+  // Mixed outcome: one finishes, one asks a question — only the finished one closes.
+  const d3 = await openVia('E:\\MAIN_CLAUDE\\GoodNight');
+  const d4 = await openVia('E:\\MAIN_CLAUDE\\Stubborn');
+  d3.name = '🟨 ✓ GoodNight'; d4.name = '🟨 ✓ Stubborn';
+  log.length = 0;
+  warningChoice = 0;
+  at(10, () => { d3.name = '🟨 ⟳ GoodNight'; d4.name = '🟨 ⟳ Stubborn'; });
+  at(40, () => { d3.name = '🟨 ✓ GoodNight'; });
+  at(40, () => { d4.name = '🟨 ‼ Stubborn'; });
+  sweep = await backupAllCmd();
+  assert('a session that asks a question stays open while the others close',
+    sweep.includes('done') && sweep.includes('attention') &&
+    log.some((l) => l === 'dispose:E:\\MAIN_CLAUDE\\GoodNight') &&
+    !log.some((l) => l === 'dispose:E:\\MAIN_CLAUDE\\Stubborn'),
+    JSON.stringify(sweep));
+  assert('a partial sweep warns instead of signing off',
+    log.some((l) => l.startsWith('WARN:') && l.includes('נשארו פתוחים')), JSON.stringify(log.filter((l) => l.startsWith('WARN:'))));
 
   console.log('\n' + (failures ? failures + ' FAILED' : 'all checks passed'));
   process.exitCode = failures ? 1 : 0;

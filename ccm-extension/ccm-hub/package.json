@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -21,6 +21,10 @@
       {
         "command": "ccmHub.closeSession",
         "title": "ccm: Close terminal (backup / close / keep)"
+      },
+      {
+        "command": "ccmHub.backupAllSessions",
+        "title": "ccm: End of day — backup & close ALL sessions"
       },
       {
         "command": "ccmHub.copyTerminalSelection",
@@ -47,6 +51,10 @@
         "key": "alt+q"
       },
       {
+        "command": "ccmHub.backupAllSessions",
+        "key": "alt+shift+q"
+      },
+      {
         "command": "ccmHub.openFileBrowser",
         "key": "alt+e"
       },
@@ -61,12 +69,20 @@
         {
           "command": "ccmHub.closeSession",
           "group": "navigation@1"
+        },
+        {
+          "command": "ccmHub.backupAllSessions",
+          "group": "navigation@2"
         }
       ],
       "terminal/context": [
         {
           "command": "ccmHub.closeSession",
           "group": "navigation@1"
+        },
+        {
+          "command": "ccmHub.backupAllSessions",
+          "group": "navigation@2"
         }
       ],
       "editor/title": [

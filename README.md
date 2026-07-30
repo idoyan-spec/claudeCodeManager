@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-30 11:58 v26 vscode-extensions`
+**Build:** `2026-07-30 12:20 v27 backup-all`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
