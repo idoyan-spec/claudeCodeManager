@@ -1,6 +1,6 @@
 # התקנה על מחשב חדש — מדריך לבעל המחשב
 
-**Build: `2026-07-30 09:08 v24 portable-suite`**
+**Build: `2026-07-30 10:42 v25 public-repos`**
 
 מדריך זה מיועד למי שמקבל את סביבת העבודה של עידו על המחשב שלו:
 VS Code מוכן לעבודה עם Claude Code (טאבים עם סטטוס חי, בורר פרויקטים ב-`Alt+O`,
@@ -13,12 +13,9 @@ VS Code מוכן לעבודה עם Claude Code (טאבים עם סטטוס חי,
 1. **Windows 10/11**.
 2. **VS Code** מותקן — https://code.visualstudio.com
 3. **Git** מותקן — https://git-scm.com/download/win (ברירות המחדל בסדר).
-4. **חשבון GitHub עם הרשאה לריפו** — שני המאגרים פרטיים.
-   בקשו מעידו להוסיף אתכם כ-Collaborator לשניים:
-   - `idoyan-spec/claudeCodeManager`
-   - `idoyan-spec/voice-to-claude`
 
-   (בהעתקה הראשונה Git יפתח חלון התחברות ל-GitHub — מתחברים פעם אחת וזהו.)
+זהו — **לא צריך חשבון GitHub ולא שום התחברות**: שני המאגרים ציבוריים (רישיון MIT),
+ההורדה והעדכונים עובדים בלי הזדהות. לשנות אותם יכול רק עידו.
 
 > Python 3.10+ נדרש לכלי ההקלטה — אם אין, המתקין ינסה להתקין לבד דרך winget.
 
@@ -76,7 +73,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
 
 ## פתרון תקלות נפוצות
 
-- **"clone failed / repository not found"** — החשבון שלכם עדיין לא Collaborator. בקשו מעידו הזמנה ואשרו אותה במייל מ-GitHub.
+- **"clone failed"** — המאגרים ציבוריים, אז זו כמעט תמיד בעיית אינטרנט. לבדוק חיבור ולהריץ שוב.
 - **Python הותקן אבל לא זוהה** — לפתוח PowerShell **חדש** ולהריץ את bootstrap שוב.
 - **אין הדבקה אחרי הכתבה** — לבדוק את `service_log.txt` בתיקיית `voice-to-claude`.
 - **כרטיס ההסבר לא עובד** — כנראה דילגתם על המפתח; להריץ bootstrap שוב ולהדביק מפתח.

@@ -30,10 +30,10 @@
   `git pull` + this same idempotent install. No ports, no telemetry. The only other
   network calls are the git pulls and (if Claude is missing) its official installer.
 
-  NOTE both repos are PRIVATE. A new machine's GitHub account must be added as a
-  collaborator (github.com -> repo -> Settings -> Collaborators) to clone/pull.
+  Both repos are PUBLIC (MIT license) - cloning and pulling needs no GitHub
+  account, no login, no invitation. Only Ido's account can push changes.
 
-  BUILD: 2026-07-30 09:08 v24 portable-suite
+  BUILD: 2026-07-30 10:42 v25 public-repos
 #>
 [CmdletBinding()]
 param(
@@ -44,7 +44,7 @@ param(
     [switch]$Silent         # non-interactive (used by the auto-update task): never prompts
 )
 
-$BUILD = '2026-07-30 09:08 v24 portable-suite'
+$BUILD = '2026-07-30 10:42 v25 public-repos'
 $root  = Split-Path -Parent $PSScriptRoot
 $warnings = 0
 
@@ -223,8 +223,8 @@ if ($NoVoice) {
             ForEach-Object { Write-Host "       $_" -ForegroundColor DarkGray }
         if (Test-Path (Join-Path $voiceDir 'voice_service.py')) { Ok "cloned" }
         else {
-            Warn "clone failed. The repo is PRIVATE - this machine's GitHub account must be added"
-            Warn "as a collaborator by Ido (repo Settings -> Collaborators), then re-run bootstrap."
+            Warn "clone failed - the repo is public, so this is usually a network problem."
+            Warn "Check the internet connection and re-run bootstrap."
             $voiceDir = $null
         }
     }
