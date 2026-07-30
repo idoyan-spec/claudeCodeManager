@@ -1,6 +1,6 @@
 # Claude Code Manager (ccm)
 
-**Build:** `2026-07-17 14:05 v20 window-confirm-close`
+**Build:** `2026-07-30 09:08 v24 portable-suite`
 
 A lightweight "mission control" for running many Claude Code sessions at once,
 inside a **single VS Code window** with a **vertical tab list** that shows each
@@ -46,8 +46,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
 ```
 
 `bootstrap.ps1` is idempotent: **run it again any time to update** to whatever was
-added since (it `git pull`s first, then re-installs). Then open a **new** VS Code
+added since (it `git pull`s first, then re-installs). It also installs the
+**Voice-to-Claude dictation tool** (sibling repo, local Whisper — hold Right Ctrl
+and speak), prompts the machine's owner for **their own Gemini API key** when no
+key source exists (stored encrypted in Windows Credential Manager, never a file),
+and registers a hidden **auto-update task** (at logon + every 12h) so every
+machine follows whatever is pushed to the repos. Then open a **new** VS Code
 window, press **`Alt+O`**, and pick a project.
+
+**Setting up someone else's machine?** Hand them the Hebrew one-pager:
+[docs/INSTALL.md](docs/INSTALL.md) (prerequisites, the one command, what it asks, updates).
 
 <details><summary>Manual, step by step (if you don't want the umbrella script)</summary>
 
