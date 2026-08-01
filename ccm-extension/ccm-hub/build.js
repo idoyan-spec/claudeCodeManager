@@ -10,6 +10,6 @@
 // Alt+E file browser. If what you see on screen is not this string, VS Code is
 // running an older copy from ~/.vscode/extensions — re-run install-extension.ps1
 // and reload the window.
-const BUILD = '2026-07-30 12:20 v27 backup-all';
+const BUILD = '2026-08-02 13:05 v28 rtl-copy-fix';
 
 module.exports = { BUILD };

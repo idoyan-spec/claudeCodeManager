@@ -2,7 +2,7 @@
   "name": "hub",
   "displayName": "Claude Code Manager Hub",
   "description": "One-click: open a Claude Code session as a new terminal in the current VS Code window.",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "publisher": "ccm",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Other"],
@@ -28,7 +28,7 @@
       },
       {
         "command": "ccmHub.copyTerminalSelection",
-        "title": "ccm: Copy terminal selection (explain probe)"
+        "title": "ccm: Copy terminal selection (fixes reversed Hebrew)"
       },
       {
         "command": "ccmHub.exportMarkdownPdf",
@@ -62,6 +62,11 @@
         "command": "ccmHub.copyTerminalSelection",
         "key": "ctrl+alt+insert",
         "when": "terminalFocus"
+      },
+      {
+        "command": "ccmHub.copyTerminalSelection",
+        "key": "ctrl+c",
+        "when": "terminalFocus && terminalTextSelected"
       }
     ],
     "menus": {
@@ -151,6 +156,11 @@
               "pkg": { "type": ["string", "null"] }
             }
           }
+        },
+        "ccmHub.fixRtlCopy": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Claude Code writes Hebrew to the terminal in visual (reversed) order so it *looks* right, which makes a plain copy paste backwards. When on, `Ctrl+C` on a terminal selection (and the voice probe) copies and then converts the clipboard back to logical order. The terminal's right-click copy always stays raw."
         },
         "ccmHub.ensureAutoSave": {
           "type": "boolean",

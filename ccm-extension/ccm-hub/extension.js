@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-07-19 04:20 v22 night-autonomy
+// ccm-hub  |  BUILD: 2026-08-02 13:05 v28 rtl-copy-fix
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI or by the Alt+O project picker. No SendKeys, no
 // focus games — the Terminal API.
@@ -49,11 +49,17 @@ const SESSION_ICON = new vscode.ThemeIcon('sparkle');
 // which build is running. One constant, in build.js, for every surface.
 const { BUILD } = require('./build');
 
+// Copied Hebrew arrives from the terminal in visual (reversed) order — see
+// rtl-copy.js for why. Every copy path this extension owns goes through the fix.
+const { fixVisualHebrew } = require('./rtl-copy');
+
 const PICKER_COMMAND = 'ccmHub.openProjectPicker';
 const CLOSE_COMMAND = 'ccmHub.closeSession';
-// Ctrl+Alt+Insert -> copy the terminal selection. The voice service synthesizes this
-// keychord to read what the user selected before deciding explain-vs-record; it must be
-// in commandsToSkipShell or the terminal would swallow it. copySelection never SIGINTs.
+// Ctrl+Alt+Insert -> copy the terminal selection (the voice service synthesizes this
+// keychord to read what the user selected), and Ctrl+C when a terminal selection
+// exists -> same command, so a plain copy also lands fixed. Must be in
+// commandsToSkipShell or the terminal would swallow it. With no selection the
+// Ctrl+C binding's when-clause is false, so SIGINT still reaches the shell.
 const PROBE_COMMAND = 'ccmHub.copyTerminalSelection';
 // Export the active Markdown file to a PDF beside it, with RTL auto-detected from
 // the content. Contributed as an editor-title button that only shows for Markdown.
@@ -852,12 +858,24 @@ function activate(context) {
     vscode.commands.registerCommand(BACKUP_ALL_COMMAND, () => backupAllSessions())
   );
 
-  // The probe: copy the terminal selection so the voice service can read it. A thin
-  // wrapper over the built-in so we own its keybinding, when-clause and skip-shell entry.
+  // Copy the terminal selection, then repair the clipboard: Claude Code writes
+  // Hebrew to the terminal in visual order, so a raw copy pastes reversed. Serves
+  // both the voice probe (Ctrl+Alt+Insert) and plain Ctrl+C-with-selection.
   context.subscriptions.push(
-    vscode.commands.registerCommand(PROBE_COMMAND, () =>
-      vscode.commands.executeCommand('workbench.action.terminal.copySelection')
-    )
+    vscode.commands.registerCommand(PROBE_COMMAND, async () => {
+      await vscode.commands.executeCommand('workbench.action.terminal.copySelection');
+      if (!cfg().get('fixRtlCopy', true)) return;
+      try {
+        // copySelection resolves before the clipboard write is guaranteed
+        // visible on some hosts — a short beat avoids reading the previous copy.
+        await new Promise((r) => setTimeout(r, 50));
+        const raw = await vscode.env.clipboard.readText();
+        const fixed = fixVisualHebrew(raw);
+        if (fixed !== raw) await vscode.env.clipboard.writeText(fixed);
+      } catch {
+        /* clipboard unavailable — the raw copy already landed, keep it */
+      }
+    })
   );
 
   context.subscriptions.push(
