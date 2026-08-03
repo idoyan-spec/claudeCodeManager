@@ -41,5 +41,9 @@
   "//autosave": "Also extension-owned, same fill-only rule: `files.autoSave: afterDelay`, so lines you type in the tasks file while Claude is working reach the disk continuously and can never meet Claude's edits in an Overwrite dialog.",
 
   "//panel": "Put the terminal panel at the TOP. This only applies to a workspace with no stored panel position: VS Code persists `workbench.panel.position` PER WORKSPACE (0=left 1=right 2=bottom 3=top). The ccm-hub extension converts the workspaces that already have one, once each.",
-  "workbench.panel.defaultLocation": "top"
+  "workbench.panel.defaultLocation": "top",
+
+  "//pdf": "Markdown -> PDF export is Hebrew-first. yzane.markdown-pdf exports every document left-aligned, which is wrong here. markdown-rtl.css makes the PAGE rtl while each block picks its own direction from its first strong character, so English paragraphs and code blocks stay LTR inside a Hebrew document. The extension appends this file LAST in its style chain, so it wins without !important.",
+  "//pdf2": "REPLACE the path below with your own clone's location - it must be absolute (the extension resolves it with path.isAbsolute). install.ps1 fills it in automatically from the repo root.",
+  "markdown-pdf.styles": ["E:\\MAIN_CLAUDE\\claudeCodeManager\\vscode\\markdown-rtl.css"]
 }

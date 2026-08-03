@@ -1,4 +1,4 @@
-// ccm-hub  |  BUILD: 2026-08-02 13:05 v28 rtl-copy-fix
+// ccm-hub  |  BUILD: 2026-08-03 13:30 v29 rtl-pdf
 // Opens a Claude Code session as a NEW integrated terminal in the CURRENT window,
 // triggered by a vscode:// URI or by the Alt+O project picker. No SendKeys, no
 // focus games — the Terminal API.

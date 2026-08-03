@@ -82,6 +82,14 @@ $want = [ordered]@{
     'keyboard.dispatch'                            = 'keyCode'
 }
 
+# Markdown -> PDF export is Hebrew-first. The yzane.markdown-pdf extension exports
+# everything left-aligned by default, which is wrong for these documents; this
+# stylesheet makes the page RTL while letting each block pick its own direction
+# from its content, so English paragraphs and code stay LTR. The extension appends
+# `markdown-pdf.styles` LAST in its style chain, so the file wins without
+# !important. Absolute path: the extension resolves it via `path.isAbsolute`.
+$want['markdown-pdf.styles'] = @((Join-Path $root 'vscode\markdown-rtl.css'))
+
 # Merged separately: colorCustomizations is a nested object owned by the user,
 # so we add our keys without discarding theirs.
 #

@@ -1,0 +1,137 @@
+/*
+ * markdown-rtl.css — Hebrew-first Markdown → PDF
+ * Build: 2026-08-03 12:30 v1 rtl-pdf
+ *
+ * Loaded through the `markdown-pdf.styles` setting of the yzane.markdown-pdf
+ * extension. That setting is appended LAST in the extension's style chain
+ * (default markdown.css → highlight theme → markdown-pdf.css → these), so
+ * everything here wins on a cascade tie without !important.
+ *
+ * The problem it solves: the extension exports every document left-aligned,
+ * while these documents are usually Hebrew.
+ *
+ * The approach is deliberately NOT "force everything to the right". A forced
+ * RTL page mangles the English that these documents are full of — code, paths,
+ * commands, English headings. Instead the page BASE is RTL, and each text block
+ * resolves its own direction from its first strong character
+ * (`unicode-bidi: plaintext`). A Hebrew paragraph goes right-to-left; an English
+ * paragraph in the same file stays left-to-right. That is the behaviour a mixed
+ * Hebrew/English document actually needs.
+ */
+
+/* ---------------------------------------------------------------------------
+   1. The page itself is RTL: lists get their bullets on the right, tables read
+      right-to-left, and margins/indent mirror.
+   --------------------------------------------------------------------------- */
+html,
+body {
+	direction: rtl;
+}
+
+/* ---------------------------------------------------------------------------
+   2. Per-block automatic direction.
+
+      `unicode-bidi: plaintext` applies the Unicode "first strong character"
+      heuristic per block instead of inheriting the page direction, and with it
+      in effect `text-align: start` follows the direction the heuristic picked
+      — so alignment tracks content, not the page.
+   --------------------------------------------------------------------------- */
+body p,
+body dt,
+body dd,
+body blockquote,
+body figcaption,
+body summary,
+body h1,
+body h2,
+body h3,
+body h4,
+body h5,
+body h6 {
+	unicode-bidi: plaintext;
+	text-align: start;
+}
+
+/* List items and table cells are the exception: they keep the content-driven
+   bidi ordering, but their ALIGNMENT is pinned to the right.
+
+   A list item's bullet is drawn on the side the parent <ul> points at (right,
+   here) and is not affected by the item's own resolved direction. So letting an
+   English item align itself left would strand its bullet alone at the right edge
+   with the text across the row. Pinning keeps marker and text together — which
+   is also what an RTL word processor does with an English bullet.
+
+   Table cells are pinned for the same reason: a Hebrew table with one date or
+   version column reads as ragged when each cell picks its own side. */
+body li,
+body td,
+body th {
+	unicode-bidi: plaintext;
+	text-align: right;
+}
+
+/* The default stylesheet hard-codes `text-align: left` on table headers, which
+   would override the rule above by being more specific. Same selector, later in
+   the cascade, wins. */
+table > thead > tr > th {
+	text-align: right;
+	unicode-bidi: plaintext;
+}
+
+/* ---------------------------------------------------------------------------
+   3. Code is never reordered.
+
+      A shell command or a path must stay in logical LTR order even when it sits
+      inside a Hebrew sentence. `isolate` keeps the surrounding Hebrew from
+      pulling the code's punctuation (slashes, dots, dashes) around it.
+   --------------------------------------------------------------------------- */
+pre,
+pre code,
+code,
+kbd,
+samp,
+var,
+tt {
+	direction: ltr;
+	unicode-bidi: isolate;
+	text-align: left;
+}
+
+/* A fenced block is its own island; `isolate` on the <pre> is enough, and the
+   inner <code> must not start a second one or long lines stop wrapping. */
+pre code {
+	unicode-bidi: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   4. Mirror the decorations that the default stylesheet pins to the left.
+      Colours copied from markdown-pdf.css so the look is unchanged — only the
+      side moves.
+   --------------------------------------------------------------------------- */
+blockquote {
+	border-left: none;
+	border-right-width: 5px;
+	border-right-style: solid;
+	border-right-color: rgba(0, 122, 204, 0.5);
+	padding-right: 1em;
+	padding-left: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   5. Task lists: keep the checkbox next to the bullet on the RTL side.
+   --------------------------------------------------------------------------- */
+.task-list-item {
+	list-style-type: none;
+}
+
+.task-list-item-checkbox {
+	margin-left: 0.4em;
+	margin-right: -1.4em;
+}
+
+/* ---------------------------------------------------------------------------
+   6. Horizontal scroll inside code blocks must not push the page sideways.
+   --------------------------------------------------------------------------- */
+pre {
+	overflow-x: auto;
+}
